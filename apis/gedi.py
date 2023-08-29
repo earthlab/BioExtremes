@@ -14,10 +14,16 @@ from tqdm import tqdm
 from bs4 import BeautifulSoup
 
 
-class BaseAPI:
+# TODO: Need methods for converting hd5 files to tif that are clipped to mangrove areas. Also isolate only the bands
+#  we care about and scale the data
+
+
+class GEDI:
     """
     Defines all the attributes and methods common to the child APIs.
     """
+    _BASE_URL = None
+    _BASE_FILE_RE = r'_(?P<year>\d{4})(?P<doy>\d{3})(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2})_O(?P<orbit>\d+)_(?P<sub_oribt>\d+)_T(?P<track_number>\d+)_(?P<ppds>\d{2})_(?P<pge>\d{3})_(?P<granule>\d{2})_V002\.h5$'
 
     def __init__(self, lazy: bool = False):
         """
@@ -26,11 +32,9 @@ class BaseAPI:
         self._username = os.environ.get('BEX_USER', None)
         self._password = os.environ.get('BEX_PWD', None)
         self._core_count = os.cpu_count()
-        if not lazy:
-            pass
-            # self._configure()
         self._file_re = None
         self._tif_re = None
+        self._dates = None
 
     @staticmethod
     def retrieve_links(url: str) -> List[str]:
@@ -112,41 +116,6 @@ class BaseAPI:
                 else:
                     break
 
-    def download_time_series(self, queries: List[Tuple[str, str]], outdir: str):
-        """
-        Attempts to create download requests for each query, if that fails then makes each request in series.
-        Args:
-            queries (list): List of tuples containing the remote and local locations for each request
-        Returns:
-            outdir (str): Path to the output file directory
-        """
-        # From earthlab firedpy package
-        if len(queries) > 0:
-            print("Retrieving data... skipping over any cached files")
-            try:
-                with Pool(int(self._core_count / 4)) as pool:
-                    for _ in tqdm(pool.imap_unordered(self._download, queries), total=len(queries)):
-                        pass
-
-            except Exception as pe:
-                try:
-                    _ = [self._download(q) for q in tqdm(queries, position=0, file=sys.stdout)]
-                except Exception as e:
-                    template = "Download failed: error type {0}:\n{1!r}"
-                    message = template.format(type(e).__name__, e.args)
-                    print(message)
-
-        print(f'Wrote {len(queries)} files to {outdir}')
-
-
-class ForestHeight(BaseAPI):
-    _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/'
-
-    def __init__(self, lazy: bool = False):
-        super().__init__(lazy=lazy)
-        self._file_re = r"GEDI02_A_(?P<year>\d{4})(?P<doy>\d{3})(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2})_O(?P<orbit>\d+)_(?P<sub_oribt>\d+)_T(?P<track_number>\d+)_(?P<ppds>\d{2})_(?P<pge>\d{3})_(?P<granule>\d{2})_V(?P<version>\d{3})\.h5$"
-        self._dates = self._retrieve_dates(self._BASE_URL)
-
     def _retrieve_dates(self, url: str) -> List[datetime]:
         """
         Finds which dates are available from the server and returns them as a list of datetime objects
@@ -199,5 +168,49 @@ class ForestHeight(BaseAPI):
                         req = (remote, dest)
                         if req not in queries:
                             queries.append(req)
-        super().download_time_series(queries, outdir)
+
+        if len(queries) > 0:
+            print("Retrieving data... skipping over any cached files")
+            try:
+                with Pool(int(self._core_count / 4)) as pool:
+                    for _ in tqdm(pool.imap_unordered(self._download, queries), total=len(queries)):
+                        pass
+
+            except Exception as pe:
+                try:
+                    _ = [self._download(q) for q in tqdm(queries, position=0, file=sys.stdout)]
+                except Exception as e:
+                    template = "Download failed: error type {0}:\n{1!r}"
+                    message = template.format(type(e).__name__, e.args)
+                    print(message)
+
+        print(f'Wrote {len(queries)} files to {outdir}')
+
         return outdir
+
+
+class L2A(GEDI):
+    _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/'
+
+    def __init__(self, lazy: bool = False):
+        super().__init__(lazy=lazy)
+        self._file_re = r"GEDI02_A" + self._BASE_FILE_RE
+        self._dates = self._retrieve_dates(self._BASE_URL)
+
+
+class L2B(GEDI):
+    _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_B.002/'
+
+    def __init__(self, lazy: bool = False):
+        super().__init__(lazy=lazy)
+        self._file_re = r"GEDI02_B" + self._BASE_FILE_RE
+        self._dates = self._retrieve_dates(self._BASE_URL)
+
+
+class L1B(GEDI):
+    _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI01_B.002/'
+
+    def __init__(self, lazy: bool = False):
+        super().__init__(lazy=lazy)
+        self._file_re = r"GEDI01_B" + self._BASE_FILE_RE
+        self._dates = self._retrieve_dates(self._BASE_URL)
