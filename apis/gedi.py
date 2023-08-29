@@ -12,10 +12,14 @@ import urllib
 from tqdm import tqdm
 
 from bs4 import BeautifulSoup
-
+import numpy as np
+from osgeo import gdal
 
 # TODO: Need methods for converting hd5 files to tif that are clipped to mangrove areas. Also isolate only the bands
 #  we care about and scale the data
+
+# Extract important layers, convert off-nominals to NaN, scale if necessary, clip, and convert to tif file with only
+# necessary bands
 
 
 class GEDI:
@@ -187,6 +191,64 @@ class GEDI:
         print(f'Wrote {len(queries)} files to {outdir}')
 
         return outdir
+
+    @staticmethod
+    def _create_raster(output_path: str, columns: int, rows: int, n_band: int = 1,
+                       gdal_data_type: int = gdal.GDT_Float32,
+                       driver: str = r'GTiff'):
+        """
+        Credit:
+        https://gis.stackexchange.com/questions/290776/how-to-create-a-tiff-file-using-gdal-from-a-numpy-array-and-
+        specifying-nodata-va
+
+        Creates a blank raster for data to be written to
+        Args:
+            output_path (str): Path where the output tif file will be written to
+            columns (int): Number of columns in raster
+            rows (int): Number of rows in raster
+            n_band (int): Number of bands in raster
+            gdal_data_type (int): Data type for data written to raster
+            driver (str): Driver for conversion
+        """
+        # create driver
+        driver = gdal.GetDriverByName(driver)
+
+        output_raster = driver.Create(output_path, columns, rows, n_band, eType=gdal_data_type)
+        return output_raster
+
+    @staticmethod
+    def _numpy_array_to_raster(output_path: str, numpy_array: np.array, geo_transform,
+                               projection: str = 'wgs84', n_bands: int = 1, no_data: int = np.nan,
+                               gdal_data_type: int = gdal.GDT_Float32):
+        """
+        Returns a gdal raster data source
+        Args:
+            output_path (str): Full path to the raster to be written to disk
+            numpy_array (np.array): Numpy array containing data to write to raster
+            geo_transform (gdal GeoTransform): tuple of six values that represent the top left corner coordinates, the
+            pixel size in x and y directions, and the rotation of the image. Example [-126.75, 0.25, 0, 23.875, 0, 0.25]
+            n_bands (int): The band to write to in the output raster
+            no_data (int): Value in numpy array that should be treated as no data
+            gdal_data_type (int): Gdal data type of raster (see gdal documentation for list of values)
+        """
+        rows, columns = numpy_array.shape[0], numpy_array.shape[1]
+
+        # create output raster
+        output_raster = GEDI._create_raster(output_path, int(columns), int(rows), n_bands, gdal_data_type)
+
+        output_raster.SetProjection(projection)
+        output_raster.SetGeoTransform(geo_transform)
+        for i in range(n_bands):
+            output_band = output_raster.GetRasterBand(i+1)
+            output_band.SetNoDataValue(no_data)
+            output_band.WriteArray(numpy_array[:, :, i] if numpy_array.ndim == 3 else numpy_array)
+            output_band.FlushCache()
+            output_band.ComputeStatistics(False)
+
+        if not os.path.exists(output_path):
+            raise Exception('Failed to create raster: %s' % output_path)
+
+        return output_path
 
 
 class L2A(GEDI):

@@ -1,2 +1,4 @@
 cdsapi
 beautifulsoup4==4.12.2
+GDAL
+numpy
