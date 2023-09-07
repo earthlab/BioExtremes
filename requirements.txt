@@ -1,4 +1,9 @@
-cdsapi
+cdsapi~=0.6.1
 beautifulsoup4==4.12.2
 GDAL
-numpy
+numpy~=1.25.2
+requests~=2.31.0
+certifi~=2023.7.22
+tqdm~=4.65.0
+h5py~=3.9.0
+pandas~=2.0.3

@@ -33,8 +33,8 @@ class GEDI:
         """
         Initializes the common attributes required for each data type's API
         """
-        self._username = os.environ.get('BEX_USER', None)
-        self._password = os.environ.get('BEX_PWD', None)
+        self._username = os.environ['BEX_USER']     # TODO: raise a proper exception if these aren't defined
+        self._password = os.environ['BEX_PWD']
         self._core_count = os.cpu_count()
         self._file_re = None
         self._tif_re = None
@@ -99,6 +99,7 @@ class GEDI:
         dest = query[1]
 
         if os.path.exists(dest):
+            print("No download occurred, preexisting file at %s" % dest)
             return
 
         pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
