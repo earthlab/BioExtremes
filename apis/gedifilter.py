@@ -4,17 +4,27 @@ import pandas as pd
 
 class GEDIShotConstraint:
     """
-    Base class for a functor which filters a dataframe of GEDI shots. Automatically discards shots whose 'Quality Flag'
-    entries are not 1. Subclasses enforce additional constraints.
+    Base class for a functor which filters a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
+    entries are not 1 and whose 'degrade_flag' entries are not 0. Subclasses enforce additional constraints.
     """
 
     def __call__(self, df: pd.DataFrame) -> None:
-        dropidx = df[df['quality_flag'] == 0].index
+        # TODO: is it faster to drop flagged data first, then drop based on another constraint, or drop all at once?
+        dropidx = df[(df['quality_flag'] == 0) | (df['degrade_flag'] != 0)].index
         df.drop(index=dropidx, inplace=True)
         self._extra_constraints(df)
 
+    @classmethod
+    def getkeys(cls):
+        """Return names of objects expected in the dataframe. Subclasses should override _extra_names() method."""
+        return ['quality_flag', 'degrade_flag'] + cls._extra_keys()
+
+    @staticmethod
+    def _extra_keys():
+        return []
+
     def _extra_constraints(self, df: pd.DataFrame):
-        """May be overridden to drop additional shots."""
+        """May be overridden to drop additional shots in place."""
         pass
 
 
@@ -27,39 +37,51 @@ class LonLatBox(GEDIShotConstraint):
     def __init__(self, minlon: float = -180, maxlon: float = 180, minlat: float = -90, maxlat: float = 90):
         self._minlon, self._maxlon, self._minlat, self._maxlat = minlon, maxlon, minlat, maxlat
 
+    # overridden from parent
+    @staticmethod
+    def _extra_keys():
+        return ['lon_lowestmode', 'lat_lowestmode']
+
     # override parent method
     def _extra_constraints(self, df: pd.DataFrame):
-        # transform longitudes in case box crosses date line
-        lons = (df['longitude'] - self._minlon) % 360
+        # use transformed longitudes in case bounding box crosses international date line
+        lonst = (df['lon_lowestmode'] - self._minlon) % 360
         maxlon = (self._maxlon - self._minlon) % 360
-        dropidx = df[(lons > maxlon) | (df['latitude'] < self._minlat) | (df['latitude'] > self._maxlat)].index
+        lats = df['lat_lowestmode']
+        dropidx = df[(lonst > maxlon) | (lats < self._minlat) | (lats > self._maxlat)].index
         df.drop(index=dropidx, inplace=True)
 
 
-def filterl2a(
-        h5file: str,
-        colkeys: list[str],
-        colnames: list[str],
+def filterl2abeam(
+        gedil2a,
+        beamname: str,
+        keepobj: dict[str, str],
         csvdest: str = None,
-        keep_every: int = 1,
+        keepevery: int = 1,
         constraindf=GEDIShotConstraint()) -> pd.DataFrame:
     """
-    :param h5file: absolute path to an h5 file containing GEDI L2A data.
-    :param colkeys: keys of interest from h5 dataset, e.g. 'BEAM0101/elev_lowestmode'
-    :param colnames: desired name of column corresponding to each key in output file, e.g. 'elevation'
+    :param gedil2a: h5py.File object, or else absolute path to h5 file containing GEDI L2A data.
+    :param beamname: name of a beam from which to filter data, e.g. 'BEAM0101'.
+    :param keepobj: keys are objects under the beam to be stored; values are names to store them under. For example,
+                    assigning colkeep['elev_lowestmode'] = 'elevation' will create a column titled 'elevation' in the
+                    resulting dataframe whose contents come from gedil2a['[beamname]/elev_lowestmode'].
     :param csvdest: optional absolute path to a csv file in which to write data which passes the filter.
-    :param keep_every: create a representative sample using only one in every keep_every shots.
+    :param keepevery: create a representative sample using only one in every keep_every shots.
     :param constraindf: A function whose input is a dataframe of GEDI shots with a column for each of
                         colnames. The function returns nothing but causes the dataframe to drop the
                         unwanted shots.
     :return: A dataframe containing the filtered data.
     """
-    gedil2a = h5py.File(h5file, 'r')
+    if type(gedil2a) == str:
+        gedil2a = h5py.File(gedil2a, 'r')
     df = {}
-    for key, name in zip(colkeys, colnames):
-        df[name] = gedil2a[key][()][::keep_every]
+    keys = list(keepobj.keys()) + constraindf.getkeys()
+    names = list(keepobj.values()) + constraindf.getkeys()
+    for key, name in zip(keys, names):
+        df[name] = gedil2a[beamname + '/' + key][()][::keepevery]
     df = pd.DataFrame(df)
     constraindf(df)
+    df.drop(columns=[col for col in names if col not in keepobj.values()])
     if csvdest:
         df.to_csv(csvdest)
     return df
