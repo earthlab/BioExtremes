@@ -1,5 +1,8 @@
 import h5py
 import pandas as pd
+import os
+
+from gedi import L2A
 
 
 class GEDIShotConstraint:
@@ -53,13 +56,16 @@ class LonLatBox(GEDIShotConstraint):
 
 
 def filterl2abeam(
-        gedil2a,
-        beamname: str,
-        keepobj: dict[str, str],
-        csvdest: str = None,
-        keepevery: int = 1,
-        constraindf=GEDIShotConstraint()) -> pd.DataFrame:
+    gedil2a,
+    beamname: str,
+    keepobj: dict[str, str],
+    csvdest: str = None,
+    keepevery: int = 1,
+    constraindf=GEDIShotConstraint()
+) -> pd.DataFrame:
     """
+    Filter data from a single GEDI L2A beam during a quarter-orbit, so that only shots meeting a constraint are kept.
+
     :param gedil2a: h5py.File object, or else absolute path to h5 file containing GEDI L2A data.
     :param beamname: name of a beam from which to filter data, e.g. 'BEAM0101'.
     :param keepobj: keys are objects under the beam to be stored; values are names to store them under. For example,
@@ -83,6 +89,42 @@ def filterl2abeam(
     constraindf(df)
     df.drop(columns=[col for col in names if col not in keepobj.values()])
     if csvdest:
-        df.to_csv(csvdest)
+        df.to_csv(csvdest, mode='x')
     return df
 
+
+def downloadandfilterl2a(
+    l2aurls,
+    beamnames: list[str],
+    keepobj: dict[str, str],
+    wdir: str,
+    csvdest: str = None,
+    keepevery: int = 1,
+    constraindf=GEDIShotConstraint(),
+) -> pd.DataFrame:
+    """
+    Filter data from a collection of GEDI L2A quarter-orbits, combining all shots meeting a constraint into a single
+    dataframe/csv file.
+
+    :param l2aurls: An iterable collection of urls of h5 files containing the data.
+    :param beamnames: A list of the beams of interest, e.g. ['BEAM0101', 'BEAM0110'].
+    :param keepobj: Passed to filterl2abeam()
+    :param wdir: Absolute path to working directory for downloading quarter orbits.
+    TODO: should use memory files rather than storing/deleting on disk
+    :param csvdest: Absolute path to file where all data is stored.
+    :param keepevery: Passed to filterl2abeam()
+    :param constraindf: Passed to filterl2abeam()
+    :return: A dataframe with the filtered data from every quarter-orbit
+    """
+    l2a = L2A()
+    df = pd.DataFrame({})
+    for link in l2aurls:
+        print('Processing %s ...' % link)
+        l2a._download((link, wdir + 'temp.h5'))
+        for beamname in beamnames:
+            newdata = filterl2abeam(wdir + 'temp.h5', beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+            df = pd.concat([df, newdata], ignore_index=True)
+        os.remove(wdir + 'temp.h5')
+    if csvdest:
+        df.to_csv(csvdest)
+    return df
