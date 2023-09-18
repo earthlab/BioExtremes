@@ -40,6 +40,25 @@ class GEDI:
         self._tif_re = None
         self._dates = None
 
+    def request_raw_data(self, link: str):
+        """
+        Request data from the NASA earthdata servers. Authentication is established using the username and password
+        found in the local ~/.netrc file.
+
+        :param link: remote location of data file
+        :return: raw data returned by the server
+        """
+        pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        pm.add_password(None, "https://urs.earthdata.nasa.gov", self._username, self._password)
+        cookie_jar = CookieJar()
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPBasicAuthHandler(pm),
+            urllib.request.HTTPCookieProcessor(cookie_jar)
+        )
+        urllib.request.install_opener(opener)
+        myrequest = urllib.request.Request(link)
+        return urllib.request.urlopen(myrequest)
+
     @staticmethod
     def retrieve_links(url: str) -> List[str]:
         """
@@ -102,16 +121,7 @@ class GEDI:
             print("No download occurred, preexisting file at %s" % dest)
             return
 
-        pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        pm.add_password(None, "https://urs.earthdata.nasa.gov", self._username, self._password)
-        cookie_jar = CookieJar()
-        opener = urllib.request.build_opener(
-            urllib.request.HTTPBasicAuthHandler(pm),
-            urllib.request.HTTPCookieProcessor(cookie_jar)
-        )
-        urllib.request.install_opener(opener)
-        myrequest = urllib.request.Request(link)
-        response = urllib.request.urlopen(myrequest)
+        response = self.request_raw_data(link)
         response.begin()
         with open(dest, 'wb') as fd:
             while True:
@@ -139,7 +149,7 @@ class GEDI:
 
     def download_time_series(self, t_start: datetime = None, t_stop: datetime = None, outdir: str = None) -> str:
         """
-
+        TODO: documentation
         """
         if outdir is None:
             outdir = None  # TODO: Write to project dir somewhere

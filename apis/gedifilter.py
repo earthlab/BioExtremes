@@ -1,6 +1,6 @@
 import h5py
 import pandas as pd
-import os
+from io import BytesIO
 
 from gedi import L2A
 
@@ -66,7 +66,7 @@ def filterl2abeam(
     """
     Filter data from a single GEDI L2A beam during a quarter-orbit, so that only shots meeting a constraint are kept.
 
-    :param gedil2a: h5py.File object, or else absolute path to h5 file containing GEDI L2A data.
+    :param gedil2a: File-like object, or else absolute path to h5 file containing GEDI L2A data.
     :param beamname: name of a beam from which to filter data, e.g. 'BEAM0101'.
     :param keepobj: keys are objects under the beam to be stored; values are names to store them under. For example,
                     assigning colkeep['elev_lowestmode'] = 'elevation' will create a column titled 'elevation' in the
@@ -78,8 +78,7 @@ def filterl2abeam(
                         unwanted shots.
     :return: A dataframe containing the filtered data.
     """
-    if type(gedil2a) == str:
-        gedil2a = h5py.File(gedil2a, 'r')
+    gedil2a = h5py.File(gedil2a, 'r')
     df = {}
     keys = list(keepobj.keys()) + constraindf.getkeys()
     names = list(keepobj.values()) + constraindf.getkeys()
@@ -97,7 +96,6 @@ def downloadandfilterl2a(
     l2aurls,
     beamnames: list[str],
     keepobj: dict[str, str],
-    wdir: str,
     csvdest: str = None,
     keepevery: int = 1,
     constraindf=GEDIShotConstraint(),
@@ -109,8 +107,6 @@ def downloadandfilterl2a(
     :param l2aurls: An iterable collection of urls of h5 files containing the data.
     :param beamnames: A list of the beams of interest, e.g. ['BEAM0101', 'BEAM0110'].
     :param keepobj: Passed to filterl2abeam()
-    :param wdir: Absolute path to working directory for downloading quarter orbits.
-    TODO: should use memory files rather than storing/deleting on disk
     :param csvdest: Absolute path to file where all data is stored.
     :param keepevery: Passed to filterl2abeam()
     :param constraindf: Passed to filterl2abeam()
@@ -118,13 +114,25 @@ def downloadandfilterl2a(
     """
     l2a = L2A()
     df = pd.DataFrame({})
+
     for link in l2aurls:
         print('Processing %s ...' % link)
-        l2a._download((link, wdir + 'temp.h5'))
+        response = l2a.request_raw_data(link)
+        response.begin()
+        gedil2a = BytesIO()
+        while True:
+            chunk = response.read()
+            if chunk:
+                gedil2a.write(chunk)
+            else:
+                break
+
         for beamname in beamnames:
-            newdata = filterl2abeam(wdir + 'temp.h5', beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+            newdata = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
             df = pd.concat([df, newdata], ignore_index=True)
-        os.remove(wdir + 'temp.h5')
+
+        gedil2a.close()
+
     if csvdest:
         df.to_csv(csvdest)
     return df
