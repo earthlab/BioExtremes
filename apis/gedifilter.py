@@ -1,6 +1,8 @@
 import h5py
 import pandas as pd
 from io import BytesIO
+import os
+from multiprocessing import Pool
 
 from gedi import L2A
 
@@ -59,9 +61,9 @@ def filterl2abeam(
     gedil2a,
     beamname: str,
     keepobj: dict[str, str],
-    csvdest: str = None,
     keepevery: int = 1,
-    constraindf=GEDIShotConstraint()
+    constraindf=GEDIShotConstraint(),
+    csvdest: str = None
 ) -> pd.DataFrame:
     """
     Filter data from a single GEDI L2A beam during a quarter-orbit, so that only shots meeting a constraint are kept.
@@ -71,11 +73,11 @@ def filterl2abeam(
     :param keepobj: keys are objects under the beam to be stored; values are names to store them under. For example,
                     assigning colkeep['elev_lowestmode'] = 'elevation' will create a column titled 'elevation' in the
                     resulting dataframe whose contents come from gedil2a['[beamname]/elev_lowestmode'].
-    :param csvdest: optional absolute path to a csv file in which to write data which passes the filter.
     :param keepevery: create a representative sample using only one in every keep_every shots.
     :param constraindf: A function whose input is a dataframe of GEDI shots with a column for each of
                         colnames. The function returns nothing but causes the dataframe to drop the
                         unwanted shots.
+    :param csvdest: optional absolute path to a csv file in which to write data which passes the filter.
     :return: A dataframe containing the filtered data.
     """
     gedil2a = h5py.File(gedil2a, 'r')
@@ -92,13 +94,44 @@ def filterl2abeam(
     return df
 
 
+def _filterl2aurl(args: tuple) -> pd.DataFrame:
+    """
+    Filter multiple beams from a GEDI quarter-orbit. Inputs are taken in a single tuple for compatibility with
+    multiprocessing.Pool.imap_unordered.
+
+    :param args: Contains, in order, the remote url of the data file at usgs.gov, a list of L2A beam names, then the
+    keepobj, keepevery, and constraindf arguments as used by filterl2abeam().
+    :return: Filtered data from all beams.
+    """
+    frames = []
+    link, beamnames, keepobj, keepevery, constraindf = args
+
+    print('Processing %s ...' % link)
+    response = L2A().request_raw_data(link)
+    response.begin()
+    with BytesIO() as gedil2a:
+        while True:
+            chunk = response.read()
+            if chunk:
+                gedil2a.write(chunk)
+            else:
+                break
+        for beamname in beamnames:
+            df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+            frames.append(df)
+    print(f'Processed {link}')
+
+    return pd.concat(frames, ignore_index=True)
+
+
 def downloadandfilterl2a(
     l2aurls,
     beamnames: list[str],
     keepobj: dict[str, str],
-    csvdest: str = None,
     keepevery: int = 1,
     constraindf=GEDIShotConstraint(),
+    nproc: int = 1,
+    csvdest: str = None
 ) -> pd.DataFrame:
     """
     Filter data from a collection of GEDI L2A quarter-orbits, combining all shots meeting a constraint into a single
@@ -107,32 +140,21 @@ def downloadandfilterl2a(
     :param l2aurls: An iterable collection of urls of h5 files containing the data.
     :param beamnames: A list of the beams of interest, e.g. ['BEAM0101', 'BEAM0110'].
     :param keepobj: Passed to filterl2abeam()
-    :param csvdest: Absolute path to file where all data is stored.
     :param keepevery: Passed to filterl2abeam()
     :param constraindf: Passed to filterl2abeam()
+    :param nproc: Number of processes. Parallelization removes any guarantee on the order in which shots appear in the
+                    resulting dataframe.
+    :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every quarter-orbit
     """
-    l2a = L2A()
-    df = pd.DataFrame({})
-
-    for link in l2aurls:
-        print('Processing %s ...' % link)
-        response = l2a.request_raw_data(link)
-        response.begin()
-        gedil2a = BytesIO()
-        while True:
-            chunk = response.read()
-            if chunk:
-                gedil2a.write(chunk)
-            else:
-                break
-
-        for beamname in beamnames:
-            newdata = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
-            df = pd.concat([df, newdata], ignore_index=True)
-
-        gedil2a.close()
-
+    if csvdest and os.path.exists(csvdest):
+        raise ValueError(f'Can not overwrite prexisting file at {csvdest}')
+    argslist = [(link, beamnames, keepobj, keepevery, constraindf) for link in l2aurls]
+    print(f"Parallelizing filtering across {nproc} processes...")
+    with Pool(nproc) as pool:
+        frames = [df for df in pool.imap_unordered(_filterl2aurl, argslist)]
+    df = pd.concat(frames, ignore_index=True)
     if csvdest:
-        df.to_csv(csvdest)
+        df.to_csv(csvdest, mode='x')
     return df
+
