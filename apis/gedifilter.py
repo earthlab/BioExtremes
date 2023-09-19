@@ -3,6 +3,7 @@ import pandas as pd
 from io import BytesIO
 import os
 from multiprocessing import Pool
+from tqdm import tqdm
 
 from gedi import L2A
 
@@ -100,13 +101,12 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
     multiprocessing.Pool.imap_unordered.
 
     :param args: Contains, in order, the remote url of the data file at usgs.gov, a list of L2A beam names, then the
-    keepobj, keepevery, and constraindf arguments as used by filterl2abeam().
+                keepobj, keepevery, and constraindf arguments as used by filterl2abeam().
     :return: Filtered data from all beams.
     """
     frames = []
     link, beamnames, keepobj, keepevery, constraindf = args
 
-    print('Processing %s ...' % link)
     response = L2A().request_raw_data(link)
     response.begin()
     with BytesIO() as gedil2a:
@@ -119,13 +119,12 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
         for beamname in beamnames:
             df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
             frames.append(df)
-    print(f'Processed {link}')
 
     return pd.concat(frames, ignore_index=True)
 
 
 def downloadandfilterl2a(
-    l2aurls,
+    l2aurls: list[str],
     beamnames: list[str],
     keepobj: dict[str, str],
     keepevery: int = 1,
@@ -134,27 +133,40 @@ def downloadandfilterl2a(
     csvdest: str = None
 ) -> pd.DataFrame:
     """
-    Filter data from a collection of GEDI L2A quarter-orbits, combining all shots meeting a constraint into a single
-    dataframe/csv file.
+    Filter data from a collection of GEDI L2A quarter-orbits in parallel, combining all shots meeting a constraint into
+    a single dataframe/csv file. Files enter processing in alphabetical order, but no guarantee on the output order of
+    the data is possible unless nproc = 1.
 
-    :param l2aurls: An iterable collection of urls of h5 files containing the data.
+    :param l2aurls: A list of urls of h5 files containing the data.
     :param beamnames: A list of the beams of interest, e.g. ['BEAM0101', 'BEAM0110'].
     :param keepobj: Passed to filterl2abeam()
     :param keepevery: Passed to filterl2abeam()
     :param constraindf: Passed to filterl2abeam()
-    :param nproc: Number of processes. Parallelization removes any guarantee on the order in which shots appear in the
-                    resulting dataframe.
+    :param nproc: Number of parallel processes.
     :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every quarter-orbit
     """
     if csvdest and os.path.exists(csvdest):
         raise ValueError(f'Can not overwrite prexisting file at {csvdest}')
+    l2aurls = sorted(l2aurls)
     argslist = [(link, beamnames, keepobj, keepevery, constraindf) for link in l2aurls]
-    print(f"Parallelizing filtering across {nproc} processes...")
-    with Pool(nproc) as pool:
-        frames = [df for df in pool.imap_unordered(_filterl2aurl, argslist)]
-    df = pd.concat(frames, ignore_index=True)
-    if csvdest:
-        df.to_csv(csvdest, mode='x')
+    print(f"Filtering {nproc} files at a time; progress so far:")
+    frames = []
+    killed = False
+    try:
+        with Pool(nproc) as pool:
+            for df in tqdm(pool.imap_unordered(_filterl2aurl, argslist), total=len(argslist)):
+                frames.append(df)
+    except KeyboardInterrupt:
+        print(f'Filtering halted by user around {argslist[len(frames)][0]}')
+        killed = True
+    finally:
+        if frames:
+            df = pd.concat(frames, ignore_index=True)
+            if csvdest:
+                print(f'Saving filtered data to {csvdest}')
+                df.to_csv(csvdest, mode='x')
+        if killed:
+            exit(130)
     return df
 
