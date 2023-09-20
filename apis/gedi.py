@@ -2,12 +2,12 @@ import os
 import sys
 from multiprocessing import Pool
 import requests
-from typing import List, Tuple
+from typing import List, Tuple, Iterator
 from http.cookiejar import CookieJar
 import certifi
 import getpass
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import urllib
 from tqdm import tqdm
 
@@ -60,18 +60,21 @@ class GEDI:
         return urllib.request.urlopen(myrequest)
 
     @staticmethod
-    def retrieve_links(url: str) -> List[str]:
+    def retrieve_links(url: str, suffix: str = "") -> List[str]:
         """
         Creates a list of all the links found on a webpage
         Args:
             url (str): The URL of the webpage for which you would like a list of links
+            suffix (str): Only retrieve links with this suffix, e.g. suffix='.png' means only links to png images
+                            will be returned.
 
         Returns:
-            (list): All the links on the input URL's webpage
+            (list): All the links on the input URL's webpage ending in the suffix.
         """
         request = requests.get(url)
         soup = BeautifulSoup(request.text, 'html.parser')
-        return [link.get('href') for link in soup.find_all('a')]
+        links = [link.get('href') for link in soup.find_all('a')]
+        return [link for link in links if link.endswith(suffix)]
 
     @staticmethod
     def _cred_query() -> Tuple[str, str]:
@@ -158,14 +161,14 @@ class GEDI:
 
         t_start = self._dates[0] if t_start is None else t_start
         t_stop = self._dates[-1] if t_stop is None else t_stop
-        date_range = [date for date in self._dates if t_start <= date <= t_stop]
+        date_range = [day for day in self._dates if t_start <= day <= t_stop]
         if not date_range:
             raise ValueError('There is no data available in the time range requested')
 
         queries = []
-        for date in date_range:
-            url = urllib.parse.urljoin(self._BASE_URL, date.strftime('%Y') + '.' + date.strftime('%m') + '.' +
-                                       date.strftime('%d') + '/')
+        for day in date_range:
+            url = urllib.parse.urljoin(self._BASE_URL, day.strftime('%Y') + '.' + day.strftime('%m') + '.' +
+                                       day.strftime('%d') + '/')
             files = self.retrieve_links(url)
             for file in files:
                 match = re.match(self._file_re, file)
@@ -198,10 +201,28 @@ class GEDI:
                     template = "Download failed: error type {0}:\n{1!r}"
                     message = template.format(type(e).__name__, e.args)
                     print(message)
-
         print(f'Wrote {len(queries)} files to {outdir}')
-
         return outdir
+
+    def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> list[str]:
+        """
+        Return the url of every h5 file with data from between start and end dates (inclusive). Higher than daily
+        (e.g., hourly) precision for start/end times is not available.
+
+        :param t_start: Start date.
+        :param t_end: End date.
+        :param suffix: Only yield urls ending in this string.
+        :return: List of file urls in the prescribed range.
+        """
+        urls = []
+        delta = t_end - t_start
+        for nd in range(delta.days + 1):
+            day = t_start + timedelta(days=nd)
+            # TODO: code duplication from download_time_series()
+            dayurl = urllib.parse.urljoin(self._BASE_URL, day.strftime('%Y') + '.' + day.strftime('%m') + '.' +
+                                          day.strftime('%d') + '/')
+            urls += [dayurl + file for file in self.retrieve_links(dayurl, suffix)]
+        return urls
 
     @staticmethod
     def _create_raster(output_path: str, columns: int, rows: int, n_band: int = 1,
@@ -287,3 +308,4 @@ class L1B(GEDI):
         super().__init__(lazy=lazy)
         self._file_re = r"GEDI01_B" + self._BASE_FILE_RE
         self._dates = self._retrieve_dates(self._BASE_URL)
+

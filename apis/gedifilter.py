@@ -63,7 +63,7 @@ def filterl2abeam(
     beamname: str,
     keepobj: dict[str, str],
     keepevery: int = 1,
-    constraindf=GEDIShotConstraint(),
+    constraindf: GEDIShotConstraint = GEDIShotConstraint(),
     csvdest: str = None
 ) -> pd.DataFrame:
     """
@@ -89,7 +89,7 @@ def filterl2abeam(
         df[name] = gedil2a[beamname + '/' + key][()][::keepevery]
     df = pd.DataFrame(df)
     constraindf(df)
-    df.drop(columns=[col for col in names if col not in keepobj.values()])
+    df.drop(columns=[col for col in names if col not in keepobj.values()], inplace=True)
     if csvdest:
         df.to_csv(csvdest, mode='x')
     return df
@@ -128,13 +128,13 @@ def downloadandfilterl2a(
     beamnames: list[str],
     keepobj: dict[str, str],
     keepevery: int = 1,
-    constraindf=GEDIShotConstraint(),
+    constraindf: GEDIShotConstraint = GEDIShotConstraint(),
     nproc: int = 1,
     csvdest: str = None
 ) -> pd.DataFrame:
     """
     Filter data from a collection of GEDI L2A quarter-orbits in parallel, combining all shots meeting a constraint into
-    a single dataframe/csv file. Files enter processing in alphabetical order, but no guarantee on the output order of
+    a single dataframe/csv file. Files enter processing in lexigraphic order, but no guarantee on the output order of
     the data is possible unless nproc = 1.
 
     :param l2aurls: A list of urls of h5 files containing the data.
@@ -157,7 +157,7 @@ def downloadandfilterl2a(
         with Pool(nproc) as pool:
             for df in tqdm(pool.imap_unordered(_filterl2aurl, argslist), total=len(argslist)):
                 frames.append(df)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         print(f'Filtering halted by user around {argslist[len(frames)][0]}')
         killed = True
     finally:
