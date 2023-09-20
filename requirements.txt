@@ -1,6 +1,5 @@
 cdsapi~=0.6.1
 beautifulsoup4==4.12.2
-GDAL
 numpy~=1.25.2
 requests~=2.31.0
 certifi~=2023.7.22
