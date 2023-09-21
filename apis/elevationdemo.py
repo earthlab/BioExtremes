@@ -24,9 +24,9 @@ if __name__ == "__main__":
         l2aurls,
         beamnames,
         keepobj,
-        keepevery=50,
+        keepevery=1000,
         constraindf=cobounds,
-        csvdest='COelelevation.csv',
+        csvdest='COelevation.csv',
         nproc=os.cpu_count()
     )
 
