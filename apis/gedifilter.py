@@ -79,14 +79,20 @@ def filterl2abeam(
                         colnames. The function returns nothing but causes the dataframe to drop the
                         unwanted shots.
     :param csvdest: optional absolute path to a csv file in which to write data which passes the filter.
-    :return: A dataframe containing the filtered data.
+    :return: A dataframe containing the filtered data. Return nothing if an exception is caught.
     """
     gedil2a = h5py.File(gedil2a, 'r')
     df = {}
     keys = list(keepobj.keys()) + constraindf.getkeys()
     names = list(keepobj.values()) + constraindf.getkeys()
     for key, name in zip(keys, names):
-        df[name] = gedil2a[beamname + '/' + key][()][::keepevery]
+        try:
+            obj = beamname + '/' + key
+            df[name] = gedil2a[obj][()][::keepevery]
+        except KeyError:
+            # TODO: what is happening? At least print the name of the file
+            print(f'Download failed: could not receive data from {obj}')
+            return
     df = pd.DataFrame(df)
     constraindf(df)
     df.drop(columns=[col for col in names if col not in keepobj.values()], inplace=True)
@@ -119,7 +125,8 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
                     break
             for beamname in beamnames:
                 df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
-                frames.append(df)
+                if df is not None:
+                    frames.append(df)
         except MemoryError:
             # TODO: what is causing these?
             print(f"Memory error caused failed download from {link}")
