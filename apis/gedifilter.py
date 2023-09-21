@@ -102,7 +102,7 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
 
     :param args: Contains, in order, the remote url of the data file at usgs.gov, a list of L2A beam names, then the
                 keepobj, keepevery, and constraindf arguments as used by filterl2abeam().
-    :return: Filtered data from all beams.
+    :return: Filtered data from all beams. Return nothing if an exception is caught.
     """
     frames = []
     link, beamnames, keepobj, keepevery, constraindf = args
@@ -123,6 +123,7 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
         except MemoryError:
             # TODO: what is causing these?
             print(f"Memory error caused failed download from {link}")
+            return
 
     return pd.concat(frames, ignore_index=True)
 
@@ -160,7 +161,8 @@ def downloadandfilterl2a(
     try:
         with Pool(nproc) as pool:
             for df in tqdm(pool.imap_unordered(_filterl2aurl, argslist), total=len(argslist)):
-                frames.append(df)
+                if df:
+                    frames.append(df)
     except (KeyboardInterrupt, SystemExit):
         print(f'Filtering halted by user around {argslist[len(frames)][0]}')
         killed = True
