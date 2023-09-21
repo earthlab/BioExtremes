@@ -161,7 +161,7 @@ def downloadandfilterl2a(
     try:
         with Pool(nproc) as pool:
             for df in tqdm(pool.imap_unordered(_filterl2aurl, argslist), total=len(argslist)):
-                if df:
+                if df is not None:
                     frames.append(df)
     except (KeyboardInterrupt, SystemExit):
         print(f'Filtering halted by user around {argslist[len(frames)][0]}')
