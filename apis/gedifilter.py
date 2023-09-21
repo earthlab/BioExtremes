@@ -110,15 +110,19 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
     response = L2A().request_raw_data(link)
     response.begin()
     with BytesIO() as gedil2a:
-        while True:
-            chunk = response.read()
-            if chunk:
-                gedil2a.write(chunk)
-            else:
-                break
-        for beamname in beamnames:
-            df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
-            frames.append(df)
+        try:
+            while True:
+                chunk = response.read()
+                if chunk:
+                    gedil2a.write(chunk)
+                else:
+                    break
+            for beamname in beamnames:
+                df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+                frames.append(df)
+        except MemoryError:
+            # TODO: what is causing these?
+            print(f"Memory error caused failed download from {link}")
 
     return pd.concat(frames, ignore_index=True)
 
