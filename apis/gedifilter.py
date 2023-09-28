@@ -1,13 +1,16 @@
 import h5py
+import numpy as np
 import pandas as pd
-from io import BytesIO
 import os
 from multiprocessing import Pool
 from tqdm import tqdm
+import re
 
 from gedi import L2A
+from geometry import gch_intersects_region
 
 
+# TODO: extra constraints should enforce spatial predicate to avoid code duplication
 class GEDIShotConstraint:
     """
     Base class for a functor which filters a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
@@ -29,33 +32,40 @@ class GEDIShotConstraint:
     def _extra_keys():
         return []
 
-    def _extra_constraints(self, df: pd.DataFrame):
+    def _extra_constraints(self, df: pd.DataFrame) -> None:
         """May be overridden to drop additional shots in place."""
         pass
+
+    def spatial_predicate(self, lon, lat) -> bool:
+        """Should be overridden to enforce any spatial constraints."""
+        return True
 
 
 class LonLatBox(GEDIShotConstraint):
     """
     Call this functor on a dataframe with columns for 'longitude' and 'latitude'. Rows with coordinates
-    outside a bounding box will be dropped. Note that longitude wraps at 180 = -180.
+    outside a closed bounding box will be dropped. Note that longitude wraps at 180 = -180.
     """
 
     def __init__(self, minlon: float = -180, maxlon: float = 180, minlat: float = -90, maxlat: float = 90):
-        self._minlon, self._maxlon, self._minlat, self._maxlat = minlon, maxlon, minlat, maxlat
+        self._minlon, self._minlat, self._maxlat = minlon, minlat, maxlat
+        self._maxlont = (maxlon - minlon) % 360
 
-    # overridden from parent
     @staticmethod
     def _extra_keys():
         return ['lon_lowestmode', 'lat_lowestmode']
 
-    # override parent method
-    def _extra_constraints(self, df: pd.DataFrame):
+    def _extra_constraints(self, df: pd.DataFrame) -> None:
         # use transformed longitudes in case bounding box crosses international date line
         lonst = (df['lon_lowestmode'] - self._minlon) % 360
-        maxlon = (self._maxlon - self._minlon) % 360
         lats = df['lat_lowestmode']
-        dropidx = df[(lonst > maxlon) | (lats < self._minlat) | (lats > self._maxlat)].index
+        dropidx = df[(lonst > self._maxlont) | (lats < self._minlat) | (lats > self._maxlat)].index
         df.drop(index=dropidx, inplace=True)
+
+    def spatial_predicate(self, lon, lat) -> bool:
+        """Return whether a single point is inside the box."""
+        lont = (lon - self._minlon) % 360
+        return (lont <= self._maxlont) & (lat >= self._minlat) & (lat <= self._maxlat)
 
 
 def filterl2abeam(
@@ -101,41 +111,68 @@ def filterl2abeam(
     return df
 
 
+def _filterl2afile(
+        gedil2a,
+        beamnames: list[str],
+        keepobj: dict[str, str],
+        keepevery: int,
+        constraindf: GEDIShotConstraint
+) -> pd.DataFrame:
+    """
+    First parameter is a file-like object with data to filter. Subsequent parameters are the beamnames, keepobj,
+    keepevery, and constraindf arguments as used by downloadandfilterl2aurls(). Return a dataframe with the filtered
+    data, or nothing if no data is extracted.
+    """
+    frames = []
+    for beamname in beamnames:
+        df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+        if df is not None:
+            frames.append(df)
+    return pd.concat(frames, ignore_index=True)
+
+
+def _screenxmlpoly(xmlfile, constraint: GEDIShotConstraint) -> bool:
+    """
+    :param xmlfile: File-like object containing xml associated to granule.
+    :param constraint: spatial_predicate method used to rule out granules not intersecting region of interest.
+    :return: Where granule intersects region of interest.
+    """
+    xml = str(xmlfile.getvalue())
+    lons = [plon[16:-17] for plon in re.findall("<PointLongitude>-?[0-9]\d*\.?\d+?</PointLongitude>", xml)]
+    lats = [plon[15:-16] for plon in re.findall("<PointLatitude>-?[0-9]\d*\.?\d+?</PointLatitude>", xml)]
+    points = np.vstack([lons, lats]).astype(float).T
+    return gch_intersects_region(points, constraint.spatial_predicate)
+
+
 def _filterl2aurl(args: tuple) -> pd.DataFrame:
     """
     Filter multiple beams from a GEDI quarter-orbit. Inputs are taken in a single tuple for compatibility with
     multiprocessing.Pool.imap_unordered.
 
-    :param args: Contains, in order, the remote url of the data file at usgs.gov, a list of L2A beam names, then the
-                keepobj, keepevery, and constraindf arguments as used by filterl2abeam().
-    :return: Filtered data from all beams. Return nothing if an exception is caught.
+    :param args: Contains, in order, the remote url to the data, then the beamnames, keepobj, keepevery, and
+                    constraindf arguments as used by downloadandfilterl2aurls().
+    :return: Filtered data from all beams. Return nothing if no data is extracted.
     """
-    frames = []
+    l2a = L2A()
     link, beamnames, keepobj, keepevery, constraindf = args
-
-    response = L2A().request_raw_data(link)
-    response.begin()
-    with BytesIO() as gedil2a:
-        try:
-            while True:
-                chunk = response.read()
-                if chunk:
-                    gedil2a.write(chunk)
-                else:
-                    break
-            for beamname in beamnames:
-                df = filterl2abeam(gedil2a, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
-                if df is not None:
-                    frames.append(df)
-        except MemoryError:
-            # TODO: what is causing these?
-            print(f"Memory error caused failed download from {link}")
-            return
-
-    return pd.concat(frames, ignore_index=True)
+    # screen associated xml file to see if data is from right spatial location
+    xmlurl = link + '.xml'
+    proceed = l2a.process_in_memory_file(
+        xmlurl,
+        _screenxmlpoly,
+        constraindf
+    )
+    if proceed is False:    # may be None if an exception was caught
+        return
+    # now download and filter large h5 file
+    return l2a.process_in_memory_file(
+        link,
+        _filterl2afile,
+        beamnames, keepobj, keepevery, constraindf
+    )
 
 
-def downloadandfilterl2a(
+def downloadandfilterl2aurls(
     l2aurls: list[str],
     beamnames: list[str],
     keepobj: dict[str, str],

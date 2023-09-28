@@ -1,6 +1,9 @@
 import os
 import sys
+from io import BytesIO
 from multiprocessing import Pool
+
+import numpy as np
 import requests
 from typing import List, Tuple, Iterator
 from http.cookiejar import CookieJar
@@ -10,6 +13,7 @@ import re
 from datetime import datetime, timedelta, date
 import urllib
 from tqdm import tqdm
+from typing import Callable
 
 from bs4 import BeautifulSoup
 
@@ -56,6 +60,32 @@ class GEDI:
         urllib.request.install_opener(opener)
         myrequest = urllib.request.Request(link)
         return urllib.request.urlopen(myrequest)
+
+    def process_in_memory_file(self, link: str, func: Callable, *args, **kwargs):
+        """
+        Perform an action on the contents of a url while storing them in a memory file in RAM.
+
+        :param link: webpage url
+        :param func: Method which takes a file-like object as its first argument and performs the action.
+        :param args: Passed to func.
+        :param kwargs: Passed to func.
+        :return: Result of func([linked file], *args, **kwargs), or None if a memory error occurs.
+        """
+        response = self.request_raw_data(link)
+        response.begin()
+        with BytesIO() as memfile:
+            try:
+                while True:
+                    chunk = response.read()
+                    if chunk:
+                        memfile.write(chunk)
+                    else:
+                        break
+                return func(memfile, *args, **kwargs)
+            except MemoryError:
+                # TODO: what causes these?
+                print(f"Memory error caused failed download from {link}")
+                return
 
     @staticmethod
     def retrieve_links(url: str, suffix: str = "") -> List[str]:
@@ -204,7 +234,7 @@ class GEDI:
 
     def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> list[str]:
         """
-        Return the url of every h5 file with data from between start and end dates (inclusive). Higher than daily
+        Return the url of every file from a granule from between start and end dates (inclusive). Higher than daily
         (e.g., hourly) precision for start/end times is not available.
 
         :param t_start: Start date.
