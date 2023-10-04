@@ -182,6 +182,7 @@ def downloadandfilterl2aurls(
     csvdest: str = None
 ) -> pd.DataFrame:
     """
+    TODO: replace constraindf with separate contraints to download and subset
     Filter data from a collection of GEDI L2A quarter-orbits in parallel, combining all shots meeting a constraint into
     a single dataframe/csv file. Files enter processing in lexigraphic order, but no guarantee on the output order of
     the data is possible unless nproc = 1.
