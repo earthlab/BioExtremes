@@ -1,5 +1,7 @@
 
-from gedifilter import LonLatBox, downloadandfilterl2aurls
+from gedidownload import downloadandfilterurls
+from gedishotconstraint import LonLatBox
+from gedigranuleconstraint import GEDIGranuleConstraint
 
 
 def test_lonlatbox_across_idl():
@@ -7,17 +9,19 @@ def test_lonlatbox_across_idl():
         "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146210921_O08224_01_T04774_02_003_01_V002.h5",
         "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_02_T02527_02_003_01_V002.h5"
     ]
-    box = LonLatBox(minlon=179, maxlon=-179)    # crossing date line
+    shotconstraint = LonLatBox(minlon=179, maxlon=-179)    # crossing date line
+    granuleconstraint = GEDIGranuleConstraint(shotconstraint.spatial_predicate)
     keepobj = {
         'lon_lowestmode': 'longitude',
         'quality_flag': 'quality_flag',
         'degrade_flag': 'degrade_flag'
     }
-    data = downloadandfilterl2aurls(
+    data = downloadandfilterurls(
         granule_urls,
         ["BEAM0101"],
         keepobj,
-        constraindf=box,
+        granuleselector=granuleconstraint,
+        constraindf=shotconstraint,
         progess_bar=False
     )
     # all shots in bounding box

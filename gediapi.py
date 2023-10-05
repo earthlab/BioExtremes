@@ -1,31 +1,24 @@
+"""
+This module contains implements APIs to access GEDI L1B, L2B, and L2A data. Note that the only way to access the
+contents of a GEDI archive file is through the process_in_memory_file() method of the base GEDI class. This is to
+discourage writing unprocessed files to disk, since the raw data is large and mostly not useful.
+"""
+
 import os
-import sys
 from io import BytesIO
-from multiprocessing import Pool
 from urllib.error import HTTPError
 
-import numpy as np
 import requests
-from typing import List, Tuple, Iterator
+from typing import List, Tuple, Callable
 from http.cookiejar import CookieJar
-import certifi
 import getpass
 import re
 from datetime import datetime, timedelta, date
 import urllib
-from tqdm import tqdm
-from typing import Callable
-
 from bs4 import BeautifulSoup
 
-# TODO: Need methods for converting hd5 files to tif that are clipped to mangrove areas. Also isolate only the bands
-#  we care about and scale the data
 
-# Extract important layers, convert off-nominals to NaN, scale if necessary, clip, and convert to tif file with only
-# necessary bands
-
-
-class GEDI:
+class GEDIAPI:
     """
     Defines all the attributes and methods common to the child APIs.
     """
@@ -69,7 +62,7 @@ class GEDI:
 
     def process_in_memory_file(self, link: str, func: Callable, *args, **kwargs):
         """
-        Perform an action on the contents of a url while storing them in a memory file in RAM.
+        Perform an action on the contents of a webpage while storing them in a memory file in RAM.
 
         :param link: webpage url
         :param func: Method which takes a file-like object as its first argument and performs the action.
@@ -126,48 +119,6 @@ class GEDI:
 
         return username, password
 
-    def _configure(self) -> None:
-        """
-        Queries the user for credentials and configures SSL certificates
-        """
-        if self._username is None or self._password is None:
-            username, password = self._cred_query()
-
-            self._username = username
-            self._password = password
-
-        # This is a macOS thing... need to find path to SSL certificates and set the following environment variables
-        ssl_cert_path = certifi.where()
-        if 'SSL_CERT_FILE' not in os.environ or os.environ['SSL_CERT_FILE'] != ssl_cert_path:
-            os.environ['SSL_CERT_FILE'] = ssl_cert_path
-
-        if 'REQUESTS_CA_BUNDLE' not in os.environ or os.environ['REQUESTS_CA_BUNDLE'] != ssl_cert_path:
-            os.environ['REQUESTS_CA_BUNDLE'] = ssl_cert_path
-
-    def _download(self, query: Tuple[str, str]) -> None:
-        """
-        Downloads data from the NASA earthdata servers. Authentication is established using the username and password
-        found in the local ~/.netrc file.
-        Args:
-            query (tuple): Contains the remote location and the local path destination, respectively
-        """
-        link = query[0]
-        dest = query[1]
-
-        if os.path.exists(dest):
-            print("No download occurred, preexisting file at %s" % dest)
-            return
-
-        response = self.request_raw_data(link)
-        response.begin()
-        with open(dest, 'wb') as fd:
-            while True:
-                chunk = response.read()
-                if chunk:
-                    fd.write(chunk)
-                else:
-                    break
-
     def _retrieve_dates(self, url: str) -> List[datetime]:
         """
         Finds which dates are available from the server and returns them as a list of datetime objects
@@ -183,60 +134,6 @@ class GEDI:
 
         return sorted(list(set([datetime.strptime(link, '%Y.%m.%d/') for link in links if re.match(date_re, link) is not
                                 None])))
-
-    def download_time_series(self, t_start: datetime = None, t_stop: datetime = None, outdir: str = None) -> str:
-        """
-        TODO: documentation
-        """
-        if outdir is None:
-            outdir = None  # TODO: Write to project dir somewhere
-        else:
-            os.makedirs(outdir, exist_ok=True)
-
-        t_start = self._dates[0] if t_start is None else t_start
-        t_stop = self._dates[-1] if t_stop is None else t_stop
-        date_range = [day for day in self._dates if t_start <= day <= t_stop]
-        if not date_range:
-            raise ValueError('There is no data available in the time range requested')
-
-        queries = []
-        for day in date_range:
-            url = urllib.parse.urljoin(self._BASE_URL, day.strftime('%Y') + '.' + day.strftime('%m') + '.' +
-                                       day.strftime('%d') + '/')
-            files = self.retrieve_links(url)
-            for file in files:
-                match = re.match(self._file_re, file)
-                if match is not None:
-                    date_objs = match.groupdict()
-                    file_date = datetime(int(date_objs['year']), 1, 1) + timedelta(
-                        days=int(date_objs['doy']) - 1, hours=int(date_objs['hour']),  minutes=int(date_objs['minute']),
-                        seconds=int(date_objs['second']))
-
-                    if t_start <= file_date <= t_stop:
-                        remote = urllib.parse.urljoin(url, file)
-                        dest = os.path.join(outdir, file)
-                        if os.path.exists(dest):
-                            continue
-                        req = (remote, dest)
-                        if req not in queries:
-                            queries.append(req)
-
-        if len(queries) > 0:
-            print("Retrieving data... skipping over any cached files")
-            try:
-                with Pool(int(self._core_count / 4)) as pool:
-                    for _ in tqdm(pool.imap_unordered(self._download, queries), total=len(queries)):
-                        pass
-
-            except Exception as pe:
-                try:
-                    _ = [self._download(q) for q in tqdm(queries, position=0, file=sys.stdout)]
-                except Exception as e:
-                    template = "Download failed: error type {0}:\n{1!r}"
-                    message = template.format(type(e).__name__, e.args)
-                    print(message)
-        print(f'Wrote {len(queries)} files to {outdir}')
-        return outdir
 
     def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> list[str]:
         """
@@ -259,7 +156,7 @@ class GEDI:
         return urls
 
 
-class L2A(GEDI):
+class L2AAPI(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/'
 
     def __init__(self, lazy: bool = False):
@@ -268,7 +165,7 @@ class L2A(GEDI):
         self._dates = self._retrieve_dates(self._BASE_URL)
 
 
-class L2B(GEDI):
+class L2BAPI(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_B.002/'
 
     def __init__(self, lazy: bool = False):
@@ -277,7 +174,7 @@ class L2B(GEDI):
         self._dates = self._retrieve_dates(self._BASE_URL)
 
 
-class L1B(GEDI):
+class L1BAPI(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI01_B.002/'
 
     def __init__(self, lazy: bool = False):
