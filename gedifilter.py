@@ -49,6 +49,8 @@ class LonLatBox(GEDIShotConstraint):
 
     def __init__(self, minlon: float = -180, maxlon: float = 180, minlat: float = -90, maxlat: float = 90):
         self._minlon, self._minlat, self._maxlat = minlon, minlat, maxlat
+        while maxlon <= minlon:
+            maxlon += 360
         self._maxlont = (maxlon - minlon) % 360
 
     @staticmethod
@@ -78,6 +80,7 @@ def filterl2abeam(
 ) -> pd.DataFrame:
     """
     Filter data from a single GEDI L2A beam during a quarter-orbit, so that only shots meeting a constraint are kept.
+    Beam name is added to the dataframe.
 
     :param gedil2a: File-like object, or else absolute path to h5 file containing GEDI L2A data.
     :param beamname: name of a beam from which to filter data, e.g. 'BEAM0101'.
@@ -106,6 +109,8 @@ def filterl2abeam(
     df = pd.DataFrame(df)
     constraindf(df)
     df.drop(columns=[col for col in names if col not in keepobj.values()], inplace=True)
+    # add beam name to df
+    df['beam'] = [beamname for _ in range(df.shape[0])]
     if csvdest:
         df.to_csv(csvdest, mode='x')
     return df
@@ -146,8 +151,8 @@ def _screenxmlpoly(xmlfile, constraint: GEDIShotConstraint) -> bool:
 
 def _filterl2aurl(args: tuple) -> pd.DataFrame:
     """
-    Filter multiple beams from a GEDI quarter-orbit. Inputs are taken in a single tuple for compatibility with
-    multiprocessing.Pool.imap_unordered.
+    Filter multiple beams from a GEDI granule. Inputs are taken in a single tuple for compatibility with
+    multiprocessing.Pool.imap_unordered. Granule id is added to dataframe.
 
     :param args: Contains, in order, the remote url to the data, then the beamnames, keepobj, keepevery, and
                     constraindf arguments as used by downloadandfilterl2aurls().
@@ -165,11 +170,17 @@ def _filterl2aurl(args: tuple) -> pd.DataFrame:
     if proceed is False:    # may be None if an exception was caught
         return
     # now download and filter large h5 file
-    return l2a.process_in_memory_file(
+    df = l2a.process_in_memory_file(
         link,
         _filterl2afile,
         beamnames, keepobj, keepevery, constraindf
     )
+    # add granule id to df
+    istart = link.rindex('/') + 1
+    iend = link.rindex('.')
+    granule_id = link[istart:iend]
+    df['granule_id'] = [granule_id for _ in range(df.shape[0])]
+    return df
 
 
 def downloadandfilterl2aurls(
@@ -179,33 +190,40 @@ def downloadandfilterl2aurls(
     keepevery: int = 1,
     constraindf: GEDIShotConstraint = GEDIShotConstraint(),
     nproc: int = 1,
-    csvdest: str = None
+    csvdest: str = None,
+    progess_bar: bool = True
 ) -> pd.DataFrame:
     """
     TODO: replace constraindf with separate contraints to download and subset
     Filter data from a collection of GEDI L2A quarter-orbits in parallel, combining all shots meeting a constraint into
     a single dataframe/csv file. Files enter processing in lexigraphic order, but no guarantee on the output order of
-    the data is possible unless nproc = 1.
+    the data is possible unless nproc = 1. Additional columns added to the dataframe hold the granule id (e.g.
+    "GEDI02_A_2020146010156_O08211_01_T02527_02_003_01_V002") and the beam name (e.g. "BEAM0101") of each shot.
 
     :param l2aurls: A list of urls of h5 files containing the data.
-    :param beamnames: A list of the beams of interest, e.g. ['BEAM0101', 'BEAM0110'].
+    :param beamnames: A list of the beams of interest.
     :param keepobj: Passed to filterl2abeam()
     :param keepevery: Passed to filterl2abeam()
     :param constraindf: Passed to filterl2abeam()
     :param nproc: Number of parallel processes.
     :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every quarter-orbit
+    :param progess_bar: If set to False, progress bar is not printed. True by default.
     """
     if csvdest and os.path.exists(csvdest):
         raise ValueError(f'Can not overwrite prexisting file at {csvdest}')
     l2aurls = sorted(l2aurls)
     argslist = [(link, beamnames, keepobj, keepevery, constraindf) for link in l2aurls]
-    print(f"Filtering {nproc} files at a time; progress so far:")
+    if progess_bar:
+        print(f"Filtering {nproc} files at a time; progress so far:")
     frames = []
     killed = False
     try:
         with Pool(nproc) as pool:
-            for df in tqdm(pool.imap_unordered(_filterl2aurl, argslist), total=len(argslist)):
+            sequence = map(_filterl2aurl, argslist)
+            if progess_bar:
+                sequence = tqdm(sequence, total=len(argslist))
+            for df in sequence:
                 if df is not None:
                     frames.append(df)
     except (KeyboardInterrupt, SystemExit):

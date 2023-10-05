@@ -2,6 +2,7 @@ import os
 import sys
 from io import BytesIO
 from multiprocessing import Pool
+from urllib.error import HTTPError
 
 import numpy as np
 import requests
@@ -59,7 +60,12 @@ class GEDI:
         )
         urllib.request.install_opener(opener)
         myrequest = urllib.request.Request(link)
-        return urllib.request.urlopen(myrequest)
+        try:
+            return urllib.request.urlopen(myrequest)
+        except HTTPError as e:
+            print('An HTTPError occurred, suggesting that your authentication may have failed. \
+                    Are your credentials correct?')
+            raise e
 
     def process_in_memory_file(self, link: str, func: Callable, *args, **kwargs):
         """

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import date
 
 if __name__ == "__main__":
-    # june-august 2020
+    # 2020
     l2aurls = L2A().urls_in_date_range(
         t_start=date(2020, 1, 1),
         t_end=date(2020, 12, 31),
