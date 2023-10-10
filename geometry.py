@@ -8,7 +8,7 @@ arctan2d = lambda opp, adj: np.arctan2(opp, adj) * 180 / np.pi
 arcsind = lambda x: np.arcsin(x) * 180 / np.pi
 
 
-def latlon2cart(lon, lat):
+def latlon2cart(lat, lon):
     """Return Cartesian coordinates of a point on the globe where distance units are Earth radius."""
     x = cosd(lat) * cosd(lon)
     y = cosd(lat) * sind(lon)
@@ -17,16 +17,16 @@ def latlon2cart(lon, lat):
 
 
 def cart2latlon(x, y, z):
-    """Returns longitude and latitude of a Cartesian point."""
+    """Returns latitutude and longitude of a Cartesian point."""
     lon = arctan2d(y, x)
     lat = arcsind(z / np.sqrt(x ** 2 + y ** 2 + z ** 2))
-    return lon, lat
+    return lat, lon
 
 
 class GlobalGeodesic:
     """
     A parameterization g of the geodesic between two points on the Earth, such that g(0) is the starting point and
-    g(1) is the ending point. Returns lon, lat as a tuple.
+    g(1) is the ending point. Returns lat, lon as a tuple.
     TODO: constant speed parameterization?
     """
 
@@ -35,11 +35,11 @@ class GlobalGeodesic:
         :param start: Starting coordinates
         :param end: Ending coordinates
         """
-        lon0, lat0 = start
-        lon1, lat1 = end
+        lat0, lon0 = start
+        lat1, lon1 = end
         # convert to Cartesian coordinates
-        self._cart0 = np.array(latlon2cart(lon0, lat0))
-        self._cart1 = np.array(latlon2cart(lon1, lat1))
+        self._cart0 = np.array(latlon2cart(lat0, lon0))
+        self._cart1 = np.array(latlon2cart(lat1, lon1))
 
     def __call__(self, t: float) -> tuple:
         # convex combination of Cartesian coordinates
@@ -54,11 +54,11 @@ def gch_intersects_region(
         seed: int = 1
 ) -> bool:
     """
-    Return true with high probability if the geodesically convex hull of a set of (lon, lat) points intersects a
+    Return true with high probability if the geodesically convex hull of a set of (lat, lon) points intersects a
     region. Return false if the intersection is empty.
 
-    :param points: Each row is [lon, lat]
-    :param spatial_predicate: Boolean function of lon, lat which defines region.
+    :param points: Each row is [lat, lon], in degrees.
+    :param spatial_predicate: Boolean function of lat, lon which defines region.
     :param nsamp: Number of random samples to run. Higher nsamp reduces the false positive rate as well as compute time.
     :param seed: numpy random seed.
     """

@@ -1,6 +1,8 @@
+import numpy as np
+import matplotlib.pyplot as plt
 
 from gedidownload import downloadandfilterurls
-from gedishotconstraint import LonLatBox
+from gedishotconstraint import LonLatBox, Buffer
 from gedigranuleconstraint import GEDIGranuleConstraint
 
 
@@ -35,3 +37,23 @@ def test_lonlatbox_across_idl():
     # all shots from the same beam (only 0101 was requested)
     assert (data['beam'] == 'BEAM0101').all()
 
+
+# TODO: make this a pass/fail test rather than visual inspection?
+def test_buffered_cities():
+    urls = [
+        'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146023448_O08212_01_T03798_02_003_01_V002.h5']
+    cities = np.array([
+        [-34.93, 138.60],   # Adelaide
+        [-27.47, 153.03]    # Brisbane
+    ])
+    data = downloadandfilterurls(
+        urls,
+        ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],
+        keepobj={'lon_lowestmode': 'longitude', 'lat_lowestmode': 'latitude'},
+        constraindf=Buffer(500000, cities)
+    )
+    plt.scatter([138.60], [-34.93], label='Adelaide')
+    plt.scatter([153.03], [-27.47], label='Brisbane')
+    plt.scatter(data['longitude'], data['latitude'], s=1)
+    plt.legend()
+    plt.show()

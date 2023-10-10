@@ -1,8 +1,11 @@
 """
 This module contains objects which enforce row-by-row contraints on DataFrames of GEDI shots.
 """
-
+import numpy as np
 import pandas as pd
+from sklearn.neighbors import BallTree
+
+R_earth = 6378100   # equatorial radius in meters (astropy)
 
 
 class GEDIShotConstraint:
@@ -38,21 +41,27 @@ class GEDIShotConstraint:
         return True
 
 
-class LonLatBox(GEDIShotConstraint):
-    """
-    Call this functor on a dataframe with columns for 'longitude' and 'latitude'. Rows with coordinates
-    outside a closed bounding box will be dropped. Note that longitude wraps at 180 = -180.
-    """
-
-    def __init__(self, minlon: float = -180, maxlon: float = 180, minlat: float = -90, maxlat: float = 90):
-        self._minlon, self._minlat, self._maxlat = minlon, minlat, maxlat
-        while maxlon <= minlon:
-            maxlon += 360
-        self._maxlont = (maxlon - minlon) % 360
+class SpatialShotConstraint(GEDIShotConstraint):
+    """Constrains latitude and longitude to a region of interest."""
 
     @staticmethod
     def _extra_keys():
         return ['lon_lowestmode', 'lat_lowestmode']
+
+    def _extra_constraints(self, df: pd.DataFrame) -> None:
+        raise NotImplementedError('SpatialShotConstraint is an abstract class, only subclasses should be constructed!')
+
+
+class LonLatBox(SpatialShotConstraint):
+    """
+    Drop shots with coordinates outside a closed bounding box will be dropped. Note that longitude wraps at 180 = -180.
+    """
+
+    def __init__(self, minlat: float = -90, maxlat: float = 90, minlon: float = -180, maxlon: float = 180):
+        self._minlon, self._minlat, self._maxlat = minlon, minlat, maxlat
+        while maxlon <= minlon:
+            maxlon += 360
+        self._maxlont = (maxlon - minlon) % 360
 
     def _extra_constraints(self, df: pd.DataFrame) -> None:
         # use transformed longitudes in case bounding box crosses international date line
@@ -61,7 +70,28 @@ class LonLatBox(GEDIShotConstraint):
         dropidx = df[(lonst > self._maxlont) | (lats < self._minlat) | (lats > self._maxlat)].index
         df.drop(index=dropidx, inplace=True)
 
-    def spatial_predicate(self, lon, lat) -> bool:
+    def spatial_predicate(self, lat, lon) -> bool:
         """Return whether a point is inside the box."""
         lont = (lon - self._minlon) % 360
         return (lont <= self._maxlont) & (lat >= self._minlat) & (lat <= self._maxlat)
+
+
+class Buffer(SpatialShotConstraint):
+    """Drop shots with coordinates farther that a fixed radius from a discrete set of points."""
+
+    def __init__(self, radius: float, points: np.ndarray):
+        """
+        :param radius: should be in meters.
+        :param points: should have two columns, latitudes then longitudes, in degrees.
+        """
+        self._r = radius / R_earth  # converted to Earth radii
+        self._tree = BallTree(np.radians(points))
+
+    def _extra_constraints(self, df: pd.DataFrame) -> None:
+        lon, lat = df['lon_lowestmode'], df['lat_lowestmode']
+        query = np.vstack([lat, lon]).T
+        query = np.radians(query)
+        dist, _ = self._tree.query(query)
+        dropidx = df[dist > self._r].index
+        df.drop(index=dropidx, inplace=True)
+
