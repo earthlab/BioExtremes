@@ -10,9 +10,9 @@ import os
 from multiprocessing import Pool
 from tqdm import tqdm
 
-from gediapi import L2AAPI
-from gedigranuleconstraint import GEDIGranuleConstraint
-from gedishotconstraint import GEDIShotConstraint
+from GEDI.api import L2AAPI
+from GEDI.granuleconstraint import GranuleConstraint
+from GEDI.shotconstraint import ShotConstraint
 
 
 def _subsetbeam(
@@ -20,7 +20,7 @@ def _subsetbeam(
     beam: str,
     keepobj: dict[str, str],
     keepevery: int = 1,
-    constraindf: GEDIShotConstraint = GEDIShotConstraint(),
+    constraindf: ShotConstraint = ShotConstraint(),
     csvdest: str = None
 ) -> pd.DataFrame:
     """
@@ -66,7 +66,7 @@ def _subsetgranule(
         beamnames: list[str],
         keepobj: dict[str, str],
         keepevery: int,
-        constraindf: GEDIShotConstraint
+        constraindf: ShotConstraint
 ) -> pd.DataFrame:
     """
     First parameter is a file-like object with data to filter. Subsequent parameters are the beamnames, keepobj,
@@ -115,8 +115,8 @@ def downloadandfilterurls(
     beamnames: list[str],
     keepobj: dict[str, str],
     keepevery: int = 50,
-    granuleselector: Callable[[str], bool] = GEDIGranuleConstraint(),
-    constraindf: GEDIShotConstraint = GEDIShotConstraint(),
+    granuleselector: Callable[[str], bool] = GranuleConstraint(),
+    constraindf: ShotConstraint = ShotConstraint(),
     nproc: int = 1,
     csvdest: str = None,
     progess_bar: bool = True
@@ -136,7 +136,7 @@ def downloadandfilterurls(
     :param granuleselector: A function whose input is the url to a granule's h5 data file, and whose output (T/F)
                                 determines whether that granule will be downloaded and subsetted. Default is always
                                 True.
-    :param constraindf: A GEDIShotConstraint object to be applied to the resulting DataFrame.
+    :param constraindf: A ShotConstraint object to be applied to the resulting DataFrame.
     :param nproc: Number of parallel processes.
     :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every quarter-orbit

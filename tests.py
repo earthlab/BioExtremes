@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gedidownload import downloadandfilterurls
-from gedishotconstraint import LonLatBox, Buffer
-from gedigranuleconstraint import GEDIGranuleConstraint
+from GEDI.download import downloadandfilterurls
+from GEDI.shotconstraint import LatLonBox, Buffer
+from GEDI.granuleconstraint import GranuleConstraint
 
 
 def test_lonlatbox_across_idl():
@@ -11,8 +11,8 @@ def test_lonlatbox_across_idl():
         "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146210921_O08224_01_T04774_02_003_01_V002.h5",
         "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_02_T02527_02_003_01_V002.h5"
     ]
-    shotconstraint = LonLatBox(minlon=179, maxlon=-179)    # crossing date line
-    granuleconstraint = GEDIGranuleConstraint(shotconstraint.spatial_predicate)
+    shotconstraint = LatLonBox(minlon=179, maxlon=-179)    # crossing date line
+    granuleconstraint = GranuleConstraint(shotconstraint.spatial_predicate)
     keepobj = {
         'lon_lowestmode': 'longitude',
         'quality_flag': 'quality_flag',

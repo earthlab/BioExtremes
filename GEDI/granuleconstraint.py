@@ -5,11 +5,11 @@ This module contains tools for determining whether a GEDI granule has data withi
 import numpy as np
 import re
 
-from gediapi import L2AAPI
+from GEDI.api import L2AAPI
 from geometry import gch_intersects_region  # TODO: stop using this; it's hacky and slow
 
 
-class GEDIGranuleConstraint:
+class GranuleConstraint:
     """
     Functor used to apply granule-level constraints on GEDI data. Returns True for granules intersecting a region of
     interest.
@@ -20,8 +20,8 @@ class GEDIGranuleConstraint:
     @staticmethod
     def _polyfromxmlfile(xmlfile):
         xml = str(xmlfile.getvalue())
-        lons = [plon[16:-17] for plon in re.findall("<PointLongitude>-?[0-9]\d*\.?\d+?</PointLongitude>", xml)]
-        lats = [plon[15:-16] for plon in re.findall("<PointLatitude>-?[0-9]\d*\.?\d+?</PointLatitude>", xml)]
+        lons = [plon[16:-17] for plon in re.findall(r"<PointLongitude>-?\d*\.?\d+?</PointLongitude>", xml)]
+        lats = [plon[15:-16] for plon in re.findall(r"<PointLatitude>-?\d*\.?\d+?</PointLatitude>", xml)]
         points = np.vstack([lats, lons]).astype(float).T
         return points
 

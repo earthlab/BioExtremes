@@ -8,7 +8,7 @@ from sklearn.neighbors import BallTree
 R_earth = 6378100   # equatorial radius in meters (astropy)
 
 
-class GEDIShotConstraint:
+class ShotConstraint:
     """
     Base class for a functor which subsets a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
     entries are not 1 and whose 'degrade_flag' entries are not 0. Subclasses enforce additional constraints.
@@ -41,7 +41,7 @@ class GEDIShotConstraint:
         return True
 
 
-class SpatialShotConstraint(GEDIShotConstraint):
+class SpatialShotConstraint(ShotConstraint):
     """Constrains latitude and longitude to a region of interest."""
 
     @staticmethod
@@ -52,7 +52,7 @@ class SpatialShotConstraint(GEDIShotConstraint):
         raise NotImplementedError('SpatialShotConstraint is an abstract class, only subclasses should be constructed!')
 
 
-class LonLatBox(SpatialShotConstraint):
+class LatLonBox(SpatialShotConstraint):
     """
     Drop shots with coordinates outside a closed bounding box will be dropped. Note that longitude wraps at 180 = -180.
     """
