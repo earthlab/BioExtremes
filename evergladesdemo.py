@@ -30,8 +30,8 @@ if __name__ == "__main__":
     # contains national park
     bounds = LatLonBox(minlat=24.85, maxlat=25.89, minlon=-81.52, maxlon=-80.39)
 
-    #gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"
-    gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
+    gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"
+    #gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
     print(f"Obtaining mangrove buffer from {gmwdir}...")
     tilenames = gmw.tiles_intersecting_region(gmwdir, bounds.spatial_predicate)
     points = gmw.mangrove_locations_from_tiles(gmwdir, tilenames)
@@ -42,6 +42,6 @@ if __name__ == "__main__":
         keepobj,
         granuleselector=GranuleConstraint(bounds.spatial_predicate),    # TODO: put this predicate in geometry
         constraindf=Buffer(30, points),     # 30m resolution
-        nproc=2, #os.cpu_count(),
+        nproc=os.cpu_count(),
         csvdest="evergladesdata.csv"
     )
