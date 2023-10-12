@@ -31,10 +31,6 @@ class GEDIAPI:
         """
         self._username = os.environ['BEX_USER']     # TODO: raise a proper exception if these aren't defined
         self._password = os.environ['BEX_PWD']
-
-        print(self._username)
-        print(self._password)
-
         self._core_count = os.cpu_count()
         self._file_re = None
         self._tif_re = None
