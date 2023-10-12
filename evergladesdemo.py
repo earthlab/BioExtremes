@@ -17,13 +17,16 @@ urls = L2AAPI().urls_in_date_range(
 beamnames = ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011']
 # keep range of return heights
 keepobj = {
-    "elev_lowestmode": "mean elevation", "elev_highestreturn": "highest return"
+    "elev_lowestmode": "mean elevation",
+    "elev_highestreturn": "highest return",
+    "lat_lowestmode": "latitude",
+    "lon_lowestmode": "longitude"
 }
 # contains national park
 bounds = LatLonBox(minlat=24.85, maxlat=25.8899, minlon=-81.5183, maxlon=-80.3887)
 # mangrove locations
-gmwdir = "gmw_v3_2020"
-tilenames = gmw.tiles_intersecting_region(gmwdir)
+gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"
+tilenames = gmw.tiles_intersecting_region(gmwdir, bounds.spatial_predicate)
 points = gmw.mangrove_locations_from_tiles(gmwdir, tilenames)
 
 downloadandfilterurls(
