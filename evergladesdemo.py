@@ -12,8 +12,11 @@ from GMW import gmw
 if __name__ == "__main__":
     freeze_support()
 
+    api = L2AAPI()
+    api.check_credentials()
+
     # get all h5 files with L2A data from 2020
-    urls = L2AAPI().urls_in_date_range(
+    urls = api.urls_in_date_range(
         t_start=date(2020, 1, 1),
         t_end=date(2020, 12, 31),
         suffix='.h5'
