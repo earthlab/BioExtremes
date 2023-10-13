@@ -36,11 +36,6 @@ class GEDIAPI:
         self._tif_re = None
         self._dates = None
 
-    def check_credentials(self):
-        print("Checking authentication with https://urs.earthdata.nasa.gov...")
-        self.request_raw_data(
-            "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml")
-
     def request_raw_data(self, link: str):
         """
         Request data from the NASA earthdata servers. Authentication is established using the username and password
