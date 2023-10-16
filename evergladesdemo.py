@@ -15,10 +15,10 @@ if __name__ == "__main__":
     api = L2AAPI()
     api.check_credentials()
 
-    # get all h5 files with L2A data from 2020
+    # get all h5 files with L2A data from Summer 2020
     urls = api.urls_in_date_range(
-        t_start=date(2020, 1, 1),
-        t_end=date(2020, 12, 31),
+        t_start=date(2020, 6, 20),
+        t_end=date(2020, 9, 22),
         suffix='.h5'
     )
     # use all full power beams
