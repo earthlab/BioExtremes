@@ -2,7 +2,7 @@
 This module provides a single public method, downloadandfilterurls(), which allows users to download data from a list
 of GEDI granules, while specifying granule-level and shot-level constraints.
 """
-
+import urllib.error
 from typing import Callable
 import h5py
 import pandas as pd
@@ -20,8 +20,7 @@ def _subsetbeam(
     beam: str,
     keepobj: dict[str, str],
     keepevery: int = 1,
-    constraindf: ShotConstraint = ShotConstraint(),
-    csvdest: str = None
+    constraindf: ShotConstraint = ShotConstraint()
 ) -> pd.DataFrame:
     """
     Subset the data from a single beam from a granule, so that only shots meeting a constraint are kept.
@@ -36,7 +35,6 @@ def _subsetbeam(
     :param constraindf: A function whose input is a dataframe of GEDI shots with a column for each of
                         colnames. The function returns nothing but causes the dataframe to drop the
                         unwanted shots.
-    :param csvdest: optional absolute path to a csv file in which to write data which passes the filter.
     :return: A dataframe containing the filtered data. Return nothing if an exception is caught.
     """
     granule = h5py.File(granule, 'r')
@@ -44,20 +42,13 @@ def _subsetbeam(
     keys = list(keepobj.keys()) + constraindf.getkeys()
     names = list(keepobj.values()) + constraindf.getkeys()
     for key, name in zip(keys, names):
-        try:
-            obj = beam + '/' + key
-            df[name] = granule[obj][()][::keepevery]
-        except KeyError:
-            # TODO: what is happening? At least print the name of the file
-            print(f'Download failed: could not receive data from {obj}')
-            return
+        obj = beam + '/' + key
+        df[name] = granule[obj][()][::keepevery]
     df = pd.DataFrame(df)
     constraindf(df)
     df.drop(columns=[col for col in names if col not in keepobj.values()], inplace=True)
     # add beam name to df
     df['beam'] = [beam for _ in range(df.shape[0])]
-    if csvdest:
-        df.to_csv(csvdest, mode='x')
     return df
 
 
@@ -81,33 +72,38 @@ def _subsetgranule(
     return pd.concat(frames, ignore_index=True)
 
 
-def _processgranule(args: tuple) -> pd.DataFrame:
+def _processgranule(args: tuple) -> pd.DataFrame | str:
     """
     Filter multiple beams from a GEDI granule. Inputs are taken in a single tuple for compatibility with
     multiprocessing.Pool.imap_unordered. Granule id is added to dataframe.
 
     :param args: Contains, in order, the remote url to the data, then the beamnames, keepobj, keepevery,
                     granuleselector, and constraindf arguments as used by downloadandfilterl2aurls().
-    :return: Filtered data from all beams. Return nothing if no data is extracted.
+    :return: Filtered data from all beams. Returns the url if an URLError occurs or if the keys of keepobj are not
+                present in the granule.
     """
-    l2a = L2AAPI()  # TODO: choose which API based on link contents
-    link, beamnames, keepobj, keepevery, granuleselector, constraindf = args
-    # stop if this granule fails initial screening
-    proceed = granuleselector(link)
-    if proceed is False:    # may be None if an exception was caught
-        return
-    # download and filter large h5 file
-    df = l2a.process_in_memory_file(
-        link,
-        _subsetgranule,
-        beamnames, keepobj, keepevery, constraindf
-    )
-    # add granule id to df
-    istart = link.rindex('/') + 1
-    iend = link.rindex('.')
-    granule_id = link[istart:iend]
-    df['granule_id'] = [granule_id for _ in range(df.shape[0])]
-    return df
+    try:
+        l2a = L2AAPI()  # TODO: choose which API based on link contents
+        link, beamnames, keepobj, keepevery, granuleselector, constraindf = args
+        # stop if this granule fails initial screening
+        proceed = granuleselector(link)
+        if proceed is False:    # may be None if an exception was caught
+            return
+        # download and filter large h5 file
+        df = l2a.process_in_memory_file(
+            link,
+            _subsetgranule,
+            beamnames, keepobj, keepevery, constraindf
+        )
+        # add granule id to df
+        istart = link.rindex('/') + 1
+        iend = link.rindex('.')
+        granule_id = link[istart:iend]
+        df['granule_id'] = [granule_id for _ in range(df.shape[0])]
+        return df
+    except (urllib.error.URLError, KeyError) as e:
+        print(f"Error in filtering {link}: {e}")
+        return link
 
 
 def downloadandfilterurls(
@@ -156,10 +152,10 @@ def downloadandfilterurls(
             if progess_bar:
                 sequence = tqdm(sequence, total=len(argslist))
             for df in sequence:
-                if df is not None:
+                if type(df) == pd.DataFrame:    # df is a string if something went wrong
                     frames.append(df)
     except (KeyboardInterrupt, SystemExit):
-        print(f'Filtering halted by user around {argslist[len(frames)][0]}')
+        print(f'Filtering halted around {argslist[len(frames)][0]}')
         killed = True
     finally:
         if frames:
