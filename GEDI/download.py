@@ -135,8 +135,8 @@ def downloadandfilterurls(
     :param constraindf: A ShotConstraint object to be applied to the resulting DataFrame.
     :param nproc: Number of parallel processes.
     :param csvdest: Optional absolute path to a csv file where all data is written.
-    :return: A dataframe with the filtered data from every quarter-orbit
     :param progess_bar: If set to False, progress bar is not printed. True by default.
+    :return: A dataframe with the filtered data from every quarter-orbit
     """
     if csvdest and os.path.exists(csvdest):
         raise ValueError(f'Can not overwrite prexisting file at {csvdest}')

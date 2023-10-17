@@ -18,7 +18,8 @@ class ShotConstraint:
         # TODO: is it faster to drop flagged data first, then drop based on another constraint, or drop all at once?
         dropidx = df[(df['quality_flag'] == 0) | (df['degrade_flag'] != 0)].index
         df.drop(index=dropidx, inplace=True)
-        self._extra_constraints(df)
+        if len(df.index):   # df has rows
+            self._extra_constraints(df)
 
     @classmethod
     def getkeys(cls):

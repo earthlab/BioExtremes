@@ -15,9 +15,10 @@ if __name__ == "__main__":
     api = L2AAPI()
     api.check_credentials()
 
-    # get all h5 files with L2A data from summers 2020-23
-    urls = api.urls_in_date_range(t_start=date(2020, 6, 20), t_end=date(2020, 9, 22), suffix='.h5')
-    urls += api.urls_in_date_range(t_start=date(2021, 6, 20), t_end=date(2021, 9, 22), suffix='.h5')
+    # get all h5 files with L2A data from summers 2022-23
+    urls = []
+    #urls += api.urls_in_date_range(t_start=date(2020, 6, 20), t_end=date(2020, 9, 22), suffix='.h5')
+    #urls += api.urls_in_date_range(t_start=date(2021, 6, 20), t_end=date(2021, 9, 22), suffix='.h5')
     urls += api.urls_in_date_range(t_start=date(2022, 6, 21), t_end=date(2022, 9, 22), suffix='.h5')
     urls += api.urls_in_date_range(t_start=date(2023, 6, 21), t_end=date(2023, 9, 23), suffix='.h5')
 
