@@ -15,12 +15,12 @@ if __name__ == "__main__":
     api = L2AAPI()
     api.check_credentials()
 
-    # get all h5 files with L2A data from summers 2022-23
+    # get all h5 files with L2A data from springs 2020-23
     urls = []
-    #urls += api.urls_in_date_range(t_start=date(2020, 6, 20), t_end=date(2020, 9, 22), suffix='.h5')
-    #urls += api.urls_in_date_range(t_start=date(2021, 6, 20), t_end=date(2021, 9, 22), suffix='.h5')
-    urls += api.urls_in_date_range(t_start=date(2022, 6, 21), t_end=date(2022, 9, 22), suffix='.h5')
-    urls += api.urls_in_date_range(t_start=date(2023, 6, 21), t_end=date(2023, 9, 23), suffix='.h5')
+    urls += api.urls_in_date_range(t_start=date(2019, 3, 19), t_end=date(2020, 6, 20), suffix='.h5')
+    urls += api.urls_in_date_range(t_start=date(2021, 3, 20), t_end=date(2021, 6, 20), suffix='.h5')
+    urls += api.urls_in_date_range(t_start=date(2022, 3, 20), t_end=date(2022, 6, 21), suffix='.h5')
+    urls += api.urls_in_date_range(t_start=date(2023, 3, 20), t_end=date(2023, 6, 21), suffix='.h5')
 
     # use all full power beams
     beamnames = ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011']
@@ -48,5 +48,5 @@ if __name__ == "__main__":
         granuleselector=GranuleConstraint(bounds.spatial_predicate),    # TODO: put this predicate in geometry
         constraindf=Buffer(30, points),     # 30m resolution
         nproc=os.cpu_count(),
-        csvdest="evergladesdata.csv"
+        csvdest="evergladesspring.csv"
     )
