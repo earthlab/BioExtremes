@@ -39,9 +39,9 @@ def xyz2latlon(xyz: tuple | np.ndarray) -> np.ndarray:
     return np.array([lat, lon])
 
 
-def angle(p0: np.ndarray, p1: np.ndarray) -> np.ndarray:
+def angle(xyz0: np.ndarray, xyz1: np.ndarray) -> np.ndarray:
     """Compute the angle in degrees between two vectors using the cosine formula."""
-    return arccosd(p0 @ p1)
+    return arccosd(xyz0 @ xyz1)
 
 
 class Arc(ABC):
@@ -53,6 +53,10 @@ class Arc(ABC):
         pass
 
     @abstractmethod
+    def _xyz(self, t: float | np.ndarray) -> np.ndarray:
+        """The Cartesian coordinates of the parameterized curve."""
+        pass
+
     def __call__(self, t: float | np.ndarray) -> np.ndarray:
         """
         A constant-speed parameterization of the Arc taking values in the closed interval [0, 1].
@@ -60,12 +64,8 @@ class Arc(ABC):
         :param t: shape (,) or (n,)
         :return: lat, lon coordinates of parameterization, shape (2,) or (2, n)
         """
-        pass
-
-    @abstractmethod
-    def ccwchange(self, point: tuple) -> float:
-        """Return the counterclockwise angular length of the arc as viewed from a (lat, lon) point."""
-        pass
+        xyzt = self._xyz(t)
+        return xyz2latlon(xyzt)
 
     @abstractmethod
     def intersections(self, other, rtol: float) -> np.ndarray:
@@ -89,41 +89,29 @@ class Arc(ABC):
 class Geodesic(Arc):
     """An Arc representing the shortest path between two points."""
 
-    def __init__(self, p0: tuple, p1: tuple):
+    def __init__(self, p0: tuple, p1: tuple, _warn=True):
         self.p0 = np.array(p0)
         self.p1 = np.array(p1)
         self._xyz0 = latlon2xyz(p0)
         xyz1 = latlon2xyz(p1)
         self._angle = angle(self._xyz0, xyz1)
-        if self._angle == 180:
-            # special case to prevent ill-conditioning near antipodes
-            self._axis = np.cross(self._xyz0, np.array([0, 0, 1]))
-        else:
-            self._axis = np.cross(self._xyz0, xyz1)
+        if _warn and self._angle >= 180 - np.sqrt(np.finfo(float).eps):
+            raise RuntimeWarning("Geodesics defined by near-antipodal points are numerically unstable.")
+        self._axis = np.cross(self._xyz0, xyz1)
         self._axis /= np.linalg.norm(self._axis)
         self._orthonormal = np.cross(self._axis, self._xyz0)
         self._orthonormal /= np.linalg.norm(self._orthonormal)
-        # in case of pole
+        # slightly change destination based on numerical error
         self.p1 = self(1)
-        if np.abs(self.p0[0]) == 90:
-            self.p0[1] = self.p1[1]
 
     def length(self) -> float:
         return self._angle * np.pi / 180
 
-    def _xyzparameterization(self, t: float | np.ndarray) -> np.ndarray:
-        """The Cartesian coordinates of the parameterized curve."""
+    def _xyz(self, t: float | np.ndarray) -> np.ndarray:
         s = self._angle * t
         if isinstance(s, float):
             return self._xyz0 * cosd(s) + self._orthonormal * sind(s)
         return np.outer(self._xyz0, cosd(s)) + np.outer(self._orthonormal, sind(s))
-
-    def __call__(self, t: float | np.ndarray) -> np.ndarray:
-        xyzt = self._xyzparameterization(t)
-        return xyz2latlon(xyzt)
-
-    def ccwchange(self, point: tuple) -> float:
-        pass
 
     def _intersectsgc(self, gc, rtol) -> tuple | None:
         """
@@ -132,7 +120,7 @@ class Geodesic(Arc):
         :type gc: Geodesic
         """
         def func(t):
-            xyz = self._xyzparameterization(t)
+            xyz = self._xyz(t)
             return xyz @ gc._axis
         tint = numerics.bisection(func, atol=rtol)
         if tint is not None:
@@ -146,11 +134,11 @@ class Geodesic(Arc):
             p1 = other._intersectsgc(self, rtol / (2 * np.pi))
             if p1 is None:
                 return
-            geo = Geodesic(p0, p1)
+            geo = Geodesic(p0, p1, _warn=False)
             if geo.length() < rtol:
                 return np.array([geo(0.5)])     # return midpoint of path between intersections
             return
-        raise NotImplementedError(r"Cannot compute intersections between {type(self)} and {type(other)}")
+        raise NotImplementedError(fr"Cannot compute intersections between Geodesic and {type(other)}")
 
     def nearest(self, point: tuple, atol: float = 1e-10) -> float:
         pass

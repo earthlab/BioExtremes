@@ -137,8 +137,8 @@ class GEDIAPI:
 
     def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> list[str]:
         """
-        Return the url of every file from a granule from between p0 and p1 dates (inclusive). Higher than daily
-        (e.g., hourly) precision for p0/p1 times is not available.
+        Return the url of every file from a granule from between xyz0 and xyz1 dates (inclusive). Higher than daily
+        (e.g., hourly) precision for xyz0/xyz1 times is not available.
 
         :param t_start: Start date.
         :param t_end: End date.

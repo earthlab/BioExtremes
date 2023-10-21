@@ -7,8 +7,8 @@ from Geometry.spherical import Geodesic
 def test_geodesic_appearance():
     """Visual test; user eyeballs a Mercator projection of geodesics."""
     p0 = (90, 0)
-    p1 = (-90, 0)
-    geo01 = Geodesic(p0, p1)        # any meridian
+    p1 = (-89, 0)
+    geo01 = Geodesic(p0, p1)        # most of the prime meridian
     p2 = (45, 20)
     p3 = (45, -160)
     geo23 = Geodesic(p2, p3)        # this geodesic passes through the North Pole across date line
@@ -22,8 +22,8 @@ def test_geodesic_appearance():
     p9 = (-60, -20)
     geo89 = Geodesic(p8, p9)        # near pole
     pa = (-30, 140)
-    pb = (30, -40)
-    geoab = Geodesic(pa, pb)        # non-pole antipodes
+    pb = (-30, 140)
+    geoab = Geodesic(pa, pb)        # single point
 
     """PLOT CURVES"""
 
@@ -35,12 +35,12 @@ def test_geodesic_appearance():
         plt.scatter(latlon[1], latlon[0], s=1, c=c)
 
     for geoij, color, label in [
-        (geo01, 'red', 'meridian'),
+        (geo01, 'red', 'prime meridian'),
         (geo23, 'orange', 'through pole'),
         (geo45, 'green', 'random'),
         (geo67, 'blue', 'partial equator'),
         (geo89, 'purple', 'near pole'),
-        (geoab, 'black', 'antipodal connection')
+        (geoab, 'black', 'single point')
     ]:
         plotgeo(geoij, color, label)
 
