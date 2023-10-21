@@ -3,6 +3,8 @@ This module implements a variety of spherical geometry algorithms.
 """
 
 from abc import abstractmethod, ABC
+from typing import Iterable
+
 import numpy as np
 
 from Geometry import numerics
@@ -65,24 +67,29 @@ class Arc(ABC):
         pass
 
     @abstractmethod
-    def _xyz(self, t: float | np.ndarray) -> np.ndarray:
-        """The Cartesian coordinates of the parameterized curve."""
+    def xyz(self, t: float | np.ndarray) -> np.ndarray:
+        """
+        Unit-speed parameterization of the Arc's Cartesian coordinates in degrees.
+
+        :param t: shape (,) or (n,)
+        :return: x,y,z coordinates of parameterization, shape (3,) or (3, n)
+        """
         pass
 
     def __call__(self, t: float | np.ndarray) -> np.ndarray:
         """
-        A constant-speed parameterization of the Arc taking values in the closed interval [0, 1].
+        Unit-speed parameterization of the Arc's spherical coordinates in degrees.
 
         :param t: shape (,) or (n,)
         :return: lat, lon coordinates of parameterization, shape (2,) or (2, n)
         """
-        xyzt = self._xyz(t)
+        xyzt = self.xyz(t)
         return xyz2latlon(xyzt)
 
     @abstractmethod
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         """
-        Return a numpy array of the parameter values t at which this arc intersects another, up to a tolerance.
+        Return a numpy array of the (lat, lon) vertices at which this arc intersects another, up to a tolerance.
         Note that this array may be empty.
 
         :type other: Arc
@@ -106,7 +113,7 @@ class Arc(ABC):
 
 
 class Geodesic(Arc):
-    """An Arc representing the shortest path between two points."""
+    """An Arc representing the shortest path between two vertices."""
 
     def __init__(self, p0: tuple, p1: tuple, _warn=True):
         self.p0 = np.array(p0)
@@ -115,7 +122,7 @@ class Geodesic(Arc):
         xyz1 = latlon2xyz(p1)
         self._angle = anglexyz(self._xyz0, xyz1)
         if _warn and self._angle >= 180 - numerics.default_tol:
-            raise RuntimeWarning("Geodesics defined by near-antipodal points are numerically unstable.")
+            raise RuntimeWarning("Geodesics defined by near-antipodal vertices are numerically unstable.")
         self._axis = np.cross(self._xyz0, xyz1)
         self._axis /= np.linalg.norm(self._axis)
         self._orthonormal = np.cross(self._axis, self._xyz0)
@@ -126,11 +133,10 @@ class Geodesic(Arc):
     def length(self) -> float:
         return self._angle
 
-    def _xyz(self, t: float | np.ndarray) -> np.ndarray:
-        s = self._angle * t
-        if isinstance(s, float):
-            return self._xyz0 * cosd(s) + self._orthonormal * sind(s)
-        return np.outer(self._xyz0, cosd(s)) + np.outer(self._orthonormal, sind(s))
+    def xyz(self, t: float | np.ndarray) -> np.ndarray:
+        if isinstance(t, np.ndarray):
+            return np.outer(self._xyz0, cosd(t)) + np.outer(self._orthonormal, sind(t))
+        return self._xyz0 * cosd(t) + self._orthonormal * sind(t)
 
     def _intersectsgc(self, gc, atol) -> tuple | None:
         """
@@ -139,9 +145,9 @@ class Geodesic(Arc):
         :type gc: Geodesic
         """
         def anglefromgc(t):
-            xyz = self._xyz(t)
+            xyz = self.xyz(t)
             return xyz @ gc._axis
-        tint = numerics.bisection(anglefromgc, atol=atol)
+        tint = numerics.bisection(anglefromgc, a=0, b=self._angle, atol=atol)
         if tint is not None:
             return self(tint)
 
@@ -163,13 +169,61 @@ class Geodesic(Arc):
         xyz = latlon2xyz(point)
 
         def distance(t):
-            xyzt = self._xyz(t)
+            xyzt = self.xyz(t)
             return anglexyz(xyz, xyzt)
 
         # NOTE: golden section search returns a global minimizer here,
         # even though the distance may have two local minima!
-        return numerics.goldensection(distance, atol=atol / self._angle)    # error in t magnified in d by self._angle
+        return numerics.goldensection(distance, a=0, b=self._angle, atol=atol)
 
+
+class SimplePiecewiseArc(Arc):
+    """A simple curve consisting of Arc segments."""
+
+    def __init__(self, sides: list[Arc]):
+        self.sides = sides
+        self.checksimplicity()
+
+    def checksimplicity(self):
+        """Raise a ValueError if this is not a simple curve, i.e. it intersects itself."""
+        raise NotImplementedError("TODO: implement simplicity check")
+
+    def isclosed(self) -> bool:
+        """Return whether the curve is closed."""
+        raise NotImplementedError("")
+
+    def contains(self, point: tuple) -> bool:
+        """Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation."""
+        if not self.isclosed():
+            raise Warning("containment check for a non-closed curve")
+        raise NotImplementedError("")
+
+    """Implement abstract methods of base class Arc"""
+
+    def length(self) -> float:
+        return sum([arc.length() for arc in self.sides])
+
+    def xyz(self, t: float | np.ndarray) -> np.ndarray:
+        raise NotImplementedError("")
+
+    def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
+        raise NotImplementedError("")
+
+    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
+        raise NotImplementedError("")
+
+
+class PolyLine(SimplePiecewiseArc):
+    """The oriented boundary of a spherical polygon."""
+
+    def __init__(self, vertices: list[tuple]):
+        """
+        Construct a PolyLine from a counterclockwise-ordered sequence of (lat, lon) vertices. The last edge is
+        between vertices[-1] and vertices[0].
+        """
+        sides = [Geodesic(p0, p1) for p0, p1 in zip(vertices[:-1], vertices[1:])]
+        sides.append(Geodesic(vertices[-1], vertices[0]))
+        super.__init__(sides)
 
 
 

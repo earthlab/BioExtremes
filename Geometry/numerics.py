@@ -9,8 +9,8 @@ default_tol = np.sqrt(np.finfo(float).eps)
 
 def bisection(
         f: Callable[[float], float],
-        a: float = 0,
-        b: float = 1,
+        a: float,
+        b: float,
         atol: float = default_tol,
         fa=None,
         fb=None
@@ -43,8 +43,8 @@ invgr = (np.sqrt(5) - 1) / 2    # inverted golden ratio
 
 def goldensection(
         f: Callable[[float], float],
-        a: float = 0,
-        b: float = 1,
+        a: float,
+        b: float,
         atol: float = default_tol,
         _fx=None,
         _fy=None
