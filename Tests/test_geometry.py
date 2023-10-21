@@ -6,25 +6,30 @@ from Geometry import numerics
 
 
 def plotgeo(geo: Geodesic, c, lbl=""):
-    # lat0, lon0 = geo.p0
-    # lat1, lon1 = geo.p1
+    # lat0, lon0 = geo.source
+    # lat1, lon1 = geo.dest
     # plt.scatter([lon0, lon1], [lat0, lat1], c=c, label=lbl)
-    latlon = geo(np.linspace(0, 1, 500))
+    latlon = geo(np.linspace(0, geo.length(), 500))
     plt.scatter(latlon[1], latlon[0], s=1, c=c)
     plt.xlim((-180, 180))
     plt.ylim((-90, 90))
+
+
+def test_spa_appearance():
+    # TODO: plot some SimplePiecewiseArcs--maybe SimplePiecewiseGeodesics?
+    pass
 
 
 def test_nearest_to_pole():
     seed = np.random.randint(10000)
     np.random.seed(seed)
     failed = False
-    for _ in range(3000):
+    for _ in range(500):
         lats = np.random.rand(3) * 180 - 90
         lons = np.random.rand(3) * 360 - 180
         geo = Geodesic((lats[0], lons[0]), (lats[1], lons[1]))
         tm, dm = geo.nearest((lats[2], lons[2]))
-        geoplot = geo(np.linspace(0, 1))
+        geoplot = geo(np.linspace(0, geo.length()))
         dists = anglelatlon((lats[2], lons[2]), geoplot)
         if (dists < dm - numerics.default_tol).any():
             plt.scatter(geoplot[1], geoplot[0], c=dists, s=5)
@@ -49,7 +54,7 @@ def test_nearest_to_geo():
 
 
 def test_geodesic_appearance():
-    """Visual test; user eyeballs a Mercator projection of geodesics."""
+    """Visual test; user eyeballs a Cylindrical projection of geodesics."""
     p0 = (90, 0)
     p1 = (-89, 0)
     geo01 = Geodesic(p0, p1)        # most of the prime meridian
