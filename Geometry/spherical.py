@@ -66,7 +66,19 @@ class Arc(ABC):
         """Return the length of the Arc, in degrees."""
         pass
 
+    def _checkt(self, t):
+        """Check whether t is a valid input to the arc-length parameterization, i.e. 0 <= t <= length."""
+        t = np.array(t)
+        if (t > self.length()).any():
+            raise ValueError("Arc-length parameterization does not admit parameters t > length")
+        if (t < 0).any():
+            raise ValueError("Arc-length parameterization does not admit parameters t < 0")
+
     @abstractmethod
+    def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
+        """xyz(t) without checking t"""
+        pass
+
     def xyz(self, t: float | np.ndarray) -> np.ndarray:
         """
         Unit-speed parameterization of the Arc's Cartesian coordinates in degrees.
@@ -74,7 +86,8 @@ class Arc(ABC):
         :param t: shape (,) or (n,)
         :return: x,y,z coordinates of parameterization, shape (3,) or (3, n)
         """
-        pass
+        self._checkt(t)
+        return self._uncheckedxyz(t)
 
     def __call__(self, t: float | np.ndarray) -> np.ndarray:
         """
@@ -115,11 +128,11 @@ class Arc(ABC):
 class Geodesic(Arc):
     """An Arc representing the shortest path between two vertices."""
 
-    def __init__(self, p0: tuple, p1: tuple, _warn=True):
-        self.p0 = np.array(p0)
-        self.p1 = np.array(p1)
-        self._xyz0 = latlon2xyz(p0)
-        xyz1 = latlon2xyz(p1)
+    def __init__(self, source: tuple, dest: tuple, _warn=True):
+        self.source = np.array(source)
+        self.dest = np.array(dest)
+        self._xyz0 = latlon2xyz(source)
+        xyz1 = latlon2xyz(dest)
         self._angle = anglexyz(self._xyz0, xyz1)
         if _warn and self._angle >= 180 - numerics.default_tol:
             raise RuntimeWarning("Geodesics defined by near-antipodal vertices are numerically unstable.")
@@ -128,12 +141,12 @@ class Geodesic(Arc):
         self._orthonormal = np.cross(self._axis, self._xyz0)
         self._orthonormal /= np.linalg.norm(self._orthonormal)
         # slightly change destination based on numerical error
-        self.p1 = self(1)
+        self.dest = self(self.length())
 
     def length(self) -> float:
         return self._angle
 
-    def xyz(self, t: float | np.ndarray) -> np.ndarray:
+    def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
         if isinstance(t, np.ndarray):
             return np.outer(self._xyz0, cosd(t)) + np.outer(self._orthonormal, sind(t))
         return self._xyz0 * cosd(t) + self._orthonormal * sind(t)
@@ -160,8 +173,9 @@ class Geodesic(Arc):
             if p1 is None:
                 return
             geo = Geodesic(p0, p1, _warn=False)
-            if geo.length() < atol:
-                return np.array([geo(0.5)]).T     # return midpoint of path between intersections
+            dist = geo.length()
+            if dist < atol:
+                return np.array([geo(dist / 2)]).T     # return midpoint of path between intersections
             return
         raise NotImplementedError(fr"Cannot compute intersections between Geodesic and {type(other)}")
 
@@ -178,19 +192,46 @@ class Geodesic(Arc):
 
 
 class SimplePiecewiseArc(Arc):
-    """A simple curve consisting of Arc segments."""
+    """A continuous simple curve consisting of Arc segments."""
 
-    def __init__(self, sides: list[Arc]):
-        self.sides = sides
+    def __init__(self, arcs: list[Arc], atol: float = numerics.default_tol):
+        """
+        Initiate a SimplePiecewiseArc from a list of arcs.
+
+        :param arcs: List of Arcs, each of which starts at the end of the previous.
+        :param atol: Continuity is enforced up to this tolerance, in degrees.
+        """
+        self.arcs = arcs
+        self._atol = atol
+        self._len = np.array([sum(arcs[:i]) for i in range(len(arcs))])
+        self.checkcontinuity()
         self.checksimplicity()
+
+    def checkcontinuity(self):
+        """Raise a ValueError if this curve is not continuous."""
+        for arc1, arc2 in zip(self.arcs[:-1], self.arcs[1:]):
+            err = anglelatlon(arc1(arc1.length()), arc2(0))
+            if err > self._atol:
+                raise ValueError(fr"SimplePiecewiseArc is discontinuous at seam with tolerace {self._atol}")
 
     def checksimplicity(self):
         """Raise a ValueError if this is not a simple curve, i.e. it intersects itself."""
-        raise NotImplementedError("TODO: implement simplicity check")
+        for i in range(len(self.arcs)):
+            for j in range(i):
+                ints = self.arcs[i].intersections(self.arcs[j], atol=self._atol)
+                if ints is not None:
+                    if j == i - 1 and ints.shape[1] == 1:       # allowed to intersect end of previous arc
+                        continue
+                    if j == len(self.arcs) - 1 and int.shape[1] == 1 and self.isclosed():
+                        continue
+                    raise ValueError(fr"SimplePiecewiseArc crosses itself with tolerance {self._atol}")
 
     def isclosed(self) -> bool:
         """Return whether the curve is closed."""
-        raise NotImplementedError("")
+        arc1 = self.arcs[0]
+        arcn = self.arcs[-1]
+        dist = anglelatlon(arcn(arcn.length()), arc1(0))
+        return dist < self._atol
 
     def contains(self, point: tuple) -> bool:
         """Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation."""
@@ -201,10 +242,13 @@ class SimplePiecewiseArc(Arc):
     """Implement abstract methods of base class Arc"""
 
     def length(self) -> float:
-        return sum([arc.length() for arc in self.sides])
+        return sum([arc.length() for arc in self.arcs])
 
-    def xyz(self, t: float | np.ndarray) -> np.ndarray:
-        raise NotImplementedError("")
+    def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
+        idx = sum(t >= self._len) - 1
+        arc = self.arcs[idx]
+        s = self._len[idx]
+        return arc(t - s)
 
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         raise NotImplementedError("")
