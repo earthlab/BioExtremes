@@ -2,34 +2,82 @@
 Implements basic rootfinding and convex optimization schemes for spherical geometry.
 """
 from typing import Callable
+import numpy as np
+
+default_tol = np.sqrt(np.finfo(float).eps)
 
 
 def bisection(
-        func: Callable[[float], float],
+        f: Callable[[float], float],
         a: float = 0,
         b: float = 1,
-        atol: float = 1e-10,
+        atol: float = default_tol,
         fa=None,
         fb=None
 ):
     """
-    Use the bisection method to estimate a root of func on the interval [a, b].
+    Use the bisection method to estimate a root of f on the interval [a, b]. The root must exist and be unique.
 
-    :param func: function for rootfinding
+    :param f: function for rootfinding
     :param a: lower bound
     :param b: upper bound
     :param atol: absolute tolerance
-    :param fa: optionally func(a)
-    :param fb: optionally func(b)
-    :return: the approximate root, or None if no root is on the interval
+    :param fa: optionally f(a)
+    :param fb: optionally f(b)
+    :return: the approximate root, or None if no root is found
     """
     midpoint = (a + b) / 2
     if b - a < atol:
         return midpoint
-    fa = fa if fa is not None else func(a)
-    fb = fb if fb is not None else func(b)
-    fm = func(midpoint)
+    fa = fa if fa is not None else f(a)
+    fb = fb if fb is not None else f(b)
+    fm = f(midpoint)
     if fa * fm < 0:
-        return bisection(func, a=a, b=midpoint, atol=atol, fa=fa, fb=fm)
+        return bisection(f, a=a, b=midpoint, atol=atol, fa=fa, fb=fm)
     if fm * fb <= 0:
-        return bisection(func, a=midpoint, b=b, atol=atol, fa=fm, fb=fb)
+        return bisection(f, a=midpoint, b=b, atol=atol, fa=fm, fb=fb)
+
+
+invgr = (np.sqrt(5) - 1) / 2    # inverted golden ratio
+
+
+def goldensection(
+        f: Callable[[float], float],
+        a: float = 0,
+        b: float = 1,
+        atol: float = default_tol,
+        _fx=None,
+        _fy=None
+) -> tuple[float]:
+    """
+    Use Golden Section Search to minimize a continuous function f on the interval [a, b]. A local minimum is
+    guaranteed generally; the global minimum is guaranteed if -f is unimodal.
+
+    :param f: function to minimize
+    :param a: lower bound
+    :param b: upper bound
+    :param atol: absolute tolerance
+    :param _fx: internal use only
+    :param _fy: internal use only
+    :return: m, an approximate local minimizer, followed by f(m), the local minimum
+    """
+    # base case: return smallest of endpoints and midpoint
+    if b - a < atol:
+        m = (a + b) / 2
+        fm = f(m)
+        fa = f(a)
+        fb = f(b)
+        if fa < fm:
+            return a, fa
+        if fb < fm:
+            return b, fb
+        return m, fm
+    # recursive case: minimize over subinterval
+    x = invgr * a + (1 - invgr) * b
+    y = (1 - invgr) * a + invgr * b
+    fx = _fx if _fx is not None else f(x)
+    fy = _fy if _fy is not None else f(y)
+    if fx <= fy:
+        return goldensection(f, a=a, b=y, atol=atol, _fy=fx)
+    return goldensection(f, a=x, b=b, atol=atol, _fx=fy)
+

@@ -39,9 +39,21 @@ def xyz2latlon(xyz: tuple | np.ndarray) -> np.ndarray:
     return np.array([lat, lon])
 
 
-def angle(xyz0: np.ndarray, xyz1: np.ndarray) -> np.ndarray:
-    """Compute the angle in degrees between two vectors using the cosine formula."""
+def anglexyz(xyz0: np.ndarray, xyz1: np.ndarray) -> np.ndarray | float:
+    """
+    Compute the angle in degrees between two 3d vectors using the cosine formula. Supports shape combinations
+    (3,) and (3,); (3,) and (3, n); and (3, n) and (3, n); but not (3, n) and (3,).
+    """
     return arccosd(xyz0 @ xyz1)
+
+
+def anglelatlon(p0: np.ndarray, p1: np.ndarray) -> np.ndarray | float:
+    """
+    Compute the angle in degrees between two unit vectors in (lat, lon) spherical coordinates. Supports shape
+    combinations (2,) and (2,); (2,) and (2, n); and (2, n) and (2, n); but not (2, n) and (2,)."""
+    xyz0 = latlon2xyz(p0)
+    xyz1 = latlon2xyz(p1)
+    return anglexyz(xyz0, xyz1)
 
 
 class Arc(ABC):
@@ -49,7 +61,7 @@ class Arc(ABC):
 
     @abstractmethod
     def length(self) -> float:
-        """Return the length of the Arc, in radii."""
+        """Return the length of the Arc, in degrees."""
         pass
 
     @abstractmethod
@@ -68,21 +80,28 @@ class Arc(ABC):
         return xyz2latlon(xyzt)
 
     @abstractmethod
-    def intersections(self, other, rtol: float) -> np.ndarray:
+    def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         """
         Return a numpy array of the parameter values t at which this arc intersects another, up to a tolerance.
         Note that this array may be empty.
 
         :type other: Arc
         :param other: Another Arc to intersect.
-        :param rtol: Error tolerance, in radii.
-        :return: The array of intersections.
+        :param atol: Error tolerance, in degrees.
+        :return: The array of intersections, with shape (2, n), or None if no intersections occur.
         """
         pass
 
     @abstractmethod
-    def nearest(self, point: tuple, atol: float = 1e-10) -> float:
-        """Return the parameter t of the point on the Arc closest to a (lat, lon) point, up to an absolute tolerance."""
+    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
+        """
+        Nearest-point calculation.
+
+        :param point: query point (lat, lon)
+        :param atol: error tolerance
+        :return: t, d, where t is the parameter value of the nearest point, and d is the distance in radii to the
+                    nearest point.
+        """
         pass
 
 
@@ -94,8 +113,8 @@ class Geodesic(Arc):
         self.p1 = np.array(p1)
         self._xyz0 = latlon2xyz(p0)
         xyz1 = latlon2xyz(p1)
-        self._angle = angle(self._xyz0, xyz1)
-        if _warn and self._angle >= 180 - np.sqrt(np.finfo(float).eps):
+        self._angle = anglexyz(self._xyz0, xyz1)
+        if _warn and self._angle >= 180 - numerics.default_tol:
             raise RuntimeWarning("Geodesics defined by near-antipodal points are numerically unstable.")
         self._axis = np.cross(self._xyz0, xyz1)
         self._axis /= np.linalg.norm(self._axis)
@@ -105,7 +124,7 @@ class Geodesic(Arc):
         self.p1 = self(1)
 
     def length(self) -> float:
-        return self._angle * np.pi / 180
+        return self._angle
 
     def _xyz(self, t: float | np.ndarray) -> np.ndarray:
         s = self._angle * t
@@ -113,35 +132,44 @@ class Geodesic(Arc):
             return self._xyz0 * cosd(s) + self._orthonormal * sind(s)
         return np.outer(self._xyz0, cosd(s)) + np.outer(self._orthonormal, sind(s))
 
-    def _intersectsgc(self, gc, rtol) -> tuple | None:
+    def _intersectsgc(self, gc, atol) -> tuple | None:
         """
         Return where this geodesic intersects the great circle containing another geodesic gc.
 
         :type gc: Geodesic
         """
-        def func(t):
+        def anglefromgc(t):
             xyz = self._xyz(t)
             return xyz @ gc._axis
-        tint = numerics.bisection(func, atol=rtol)
+        tint = numerics.bisection(anglefromgc, atol=atol)
         if tint is not None:
             return self(tint)
 
-    def intersections(self, other, rtol: float = 1e-10) -> np.ndarray:
+    def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         if isinstance(other, Geodesic):
-            p0 = self._intersectsgc(other, rtol / (2 * np.pi))
+            p0 = self._intersectsgc(other, atol / (2 * np.pi))
             if p0 is None:
                 return
-            p1 = other._intersectsgc(self, rtol / (2 * np.pi))
+            p1 = other._intersectsgc(self, atol / (2 * np.pi))
             if p1 is None:
                 return
             geo = Geodesic(p0, p1, _warn=False)
-            if geo.length() < rtol:
-                return np.array([geo(0.5)])     # return midpoint of path between intersections
+            if geo.length() < atol:
+                return np.array([geo(0.5)]).T     # return midpoint of path between intersections
             return
         raise NotImplementedError(fr"Cannot compute intersections between Geodesic and {type(other)}")
 
-    def nearest(self, point: tuple, atol: float = 1e-10) -> float:
-        pass
+    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
+        xyz = latlon2xyz(point)
+
+        def distance(t):
+            xyzt = self._xyz(t)
+            return anglexyz(xyz, xyzt)
+
+        # NOTE: golden section search returns a global minimizer here,
+        # even though the distance may have two local minima!
+        return numerics.goldensection(distance, atol=atol / self._angle)    # error in t magnified in d by self._angle
+
 
 
 

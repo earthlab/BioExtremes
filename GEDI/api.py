@@ -66,9 +66,9 @@ class GEDIAPI:
 
         :param link: webpage url
         :param func: Method which takes a file-like object as its first argument and performs the action.
-        :param args: Passed to func.
-        :param kwargs: Passed to func.
-        :return: Result of func([linked file], *args, **kwargs), or None if a memory error occurs.
+        :param args: Passed to f.
+        :param kwargs: Passed to f.
+        :return: Result of f([linked file], *args, **kwargs), or None if a memory error occurs.
         """
         response = self.request_raw_data(link)
         response.begin()

@@ -1,7 +1,51 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Geometry.spherical import Geodesic
+from Geometry.spherical import Geodesic, anglelatlon
+from Geometry import numerics
+
+
+def plotgeo(geo: Geodesic, c, lbl=""):
+    # lat0, lon0 = geo.p0
+    # lat1, lon1 = geo.p1
+    # plt.scatter([lon0, lon1], [lat0, lat1], c=c, label=lbl)
+    latlon = geo(np.linspace(0, 1, 500))
+    plt.scatter(latlon[1], latlon[0], s=1, c=c)
+    plt.xlim((-180, 180))
+    plt.ylim((-90, 90))
+
+
+def test_nearest_to_pole():
+    seed = np.random.randint(10000)
+    np.random.seed(seed)
+    failed = False
+    for _ in range(3000):
+        lats = np.random.rand(3) * 180 - 90
+        lons = np.random.rand(3) * 360 - 180
+        geo = Geodesic((lats[0], lons[0]), (lats[1], lons[1]))
+        tm, dm = geo.nearest((lats[2], lons[2]))
+        geoplot = geo(np.linspace(0, 1))
+        dists = anglelatlon((lats[2], lons[2]), geoplot)
+        if (dists < dm - numerics.default_tol).any():
+            plt.scatter(geoplot[1], geoplot[0], c=dists, s=5)
+            plotgeo(Geodesic(geo(tm), (90, 0)), c='black')
+            plt.show()
+            failed = True
+            break
+    if failed:
+        raise Exception(fr"random seed = {seed}, nearest fails to return minumum distance")
+
+
+def test_nearest_to_geo():
+    geo = Geodesic((-49, -100), (56, 93))
+    points = [(-33, 34), (88, -10), (22, 103), (-15, -135)]
+    params = [geo.nearest(p)[0] for p in points]
+    nearest = [geo(t) for t in params]
+    geos = [Geodesic(p, n) for p, n in zip(points, nearest)]
+    plotgeo(geo, c='red')
+    for g in geos:
+        plotgeo(g, c='black')
+    plt.show()
 
 
 def test_geodesic_appearance():
@@ -27,13 +71,6 @@ def test_geodesic_appearance():
 
     """PLOT CURVES"""
 
-    def plotgeo(geo: Geodesic, c, lbl):
-        lat0, lon0 = geo.p0
-        lat1, lon1 = geo.p1
-        plt.scatter([lon0, lon1], [lat0, lat1], c=c, label=lbl)
-        latlon = geo(np.linspace(0, 1, 500))
-        plt.scatter(latlon[1], latlon[0], s=1, c=c)
-
     for geoij, color, label in [
         (geo01, 'red', 'prime meridian'),
         (geo23, 'orange', 'through pole'),
@@ -52,10 +89,11 @@ def test_geodesic_appearance():
         for j in range(i + 1, 6):
             inter = geos[i].intersections(geos[j])
             if inter is not None:
-                intersections.append(inter[0])
-    intersections = np.array(intersections)
-    plt.scatter(intersections[:, 1], intersections[:, 0], label="intersections", marker='*', s=80)
+                intersections.append(inter)
+    intersections = np.hstack(intersections)
+    plt.scatter(intersections[1], intersections[0], label="intersections", marker='*', s=80)
 
     plt.legend()
     plt.show()
+
 
