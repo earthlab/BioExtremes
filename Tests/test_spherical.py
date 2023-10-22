@@ -24,9 +24,32 @@ def plotarc(arc: Arc, **kwargs):
     plt.ylim((-90, 90))
 
 
+def test_polyline_nearest():
+    points = np.array([
+        [45, -22, -22],
+        [0, -90, 90]
+    ])
+    pl = PolyLine(points)
+    res = 20
+    latplot = np.linspace(-90, 90, res)
+    lonplot = np.linspace(-180, 180, 2 * res)
+    dists = []
+    x = []
+    y = []
+    for lat in latplot:
+        for lon in lonplot:
+            _, d = pl.nearest((lat, lon))
+            dists.append(d)
+            x.append(lon)
+            y.append(lat)
+    plt.scatter(x, y, c=dists)
+    plotarc(pl, color='red')
+    plt.show()
+
+
 def test_polyline_rejection():
     """Should never reject a triangle!"""
-    for _ in range(100):
+    for _ in range(500):
         try:
             points = uniform_sample(3)
             pl = PolyLine(points)
@@ -35,11 +58,12 @@ def test_polyline_rejection():
 
 
 def test_polyline_appearance():
-    n_sides = 6
+    n_sides = 9
     n_tries = 0
 
     while True:
         try:
+            n_tries += 1
             points = uniform_sample(n_sides)
             pl = PolyLine(points)
             plotarc(pl, s=1)
@@ -47,7 +71,6 @@ def test_polyline_appearance():
             plt.show()
             break
         except fn.SphericalGeometryError:
-            n_tries += 1
             continue
 
 

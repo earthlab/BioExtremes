@@ -14,7 +14,7 @@ def bisection(
         atol: float = default_tol,
         fa=None,
         fb=None
-):
+) -> float | None:
     """
     Use the bisection method to estimate a root of f on the interval [a, b]. The root must exist and be unique.
 
@@ -48,7 +48,7 @@ def goldensection(
         atol: float = default_tol,
         _fx=None,
         _fy=None
-) -> tuple[float]:
+) -> tuple:
     """
     Use Golden Section Search to minimize a continuous function f on the interval [a, b]. A local minimum is
     guaranteed generally; the global minimum is guaranteed if -f is unimodal.
