@@ -95,27 +95,14 @@ class Geodesic(Arc):
             raise fn.SphericalGeometryError("Geodesics defined by near-antipodal points are numerically unstable.")
         self._axis = np.cross(self._xyz0, self._xyz1)
         self._axis /= np.linalg.norm(self._axis)
-        self._ortho0 = np.cross(self._axis, self._xyz0)
-        self._ortho0 /= np.linalg.norm(self._ortho0)
-        self._ortho1 = np.cross(self._xyz1, self._axis)
-        self._ortho1 /= np.linalg.norm(self._ortho1)
+        self._orthonormal = np.cross(self._axis, self._xyz0)
+        self._orthonormal /= np.linalg.norm(self._orthonormal)
 
     def length(self) -> float:
         return self._angle
 
-    """forwards and backwards parameterizations"""
-
-    def _fwdxyz(self, t: np.ndarray) -> np.ndarray:
-        return np.outer(self._xyz0, fn.cosd(t)) + np.outer(self._ortho0, fn.sind(t))
-
-    def _bwdxyz(self, t: np.ndarray) -> np.ndarray:
-        return np.outer(self._xyz1, fn.cosd(t)) + np.outer(self._ortho1, fn.sind(t))
-
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
-        a = self._angle
-        f = self._fwdxyz(t)
-        b = self._bwdxyz(a - t)
-        return ((a - t) * f + t * b) / a
+        return np.outer(self._xyz0, fn.cosd(t)) + np.outer(self._orthonormal, fn.sind(t))
 
     def _intersectsgc(self, gc, atol) -> tuple | None:
         """
