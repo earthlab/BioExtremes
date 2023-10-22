@@ -29,7 +29,7 @@ class GranuleConstraint:
     def getboundingpolygon(cls, url) -> np.ndarray:
         """
         :param url: Link to a granule's associated h5 file.
-        :return: The bounding polygon of the granule listed by the xml file, as an ordered list of (lat, lon) vertices.
+        :return: The bounding polygon of the granule listed by the xml file, as an ordered list of (lat, lon) points.
         """
         l2a = L2AAPI()  # TODO: choose which API based on link contents
         xmlurl = cls.getxmlurl(url)

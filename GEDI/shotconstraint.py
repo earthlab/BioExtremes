@@ -77,7 +77,7 @@ class LatLonBox(SpatialShotConstraint):
 
 
 class Buffer(SpatialShotConstraint):
-    """Drop shots with coordinates farther that a fixed radius from a discrete set of vertices."""
+    """Drop shots with coordinates farther that a fixed radius from a discrete set of points."""
 
     def __init__(self, radius: float, points: np.ndarray):
         """

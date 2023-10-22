@@ -45,14 +45,18 @@ def anglexyz(xyz0: np.ndarray, xyz1: np.ndarray) -> np.ndarray | float:
     Compute the angle in degrees between two 3d vectors using the cosine formula. Supports shape combinations
     (3,) and (3,); (3,) and (3, n); and (3, n) and (3, n); but not (3, n) and (3,).
     """
-    return arccosd(xyz0 @ xyz1)
+    p0 = xyz2latlon(xyz0)
+    p1 = xyz2latlon(xyz1)
+    return anglelatlon(p0, p1)
 
 
-def anglelatlon(p0: np.ndarray, p1: np.ndarray) -> np.ndarray | float:
+def anglelatlon(p0: tuple | np.ndarray, p1: tuple | np.ndarray) -> float | np.ndarray:
     """
     Compute the angle in degrees between two unit vectors in (lat, lon) spherical coordinates. Supports shape
-    combinations (2,) and (2,); (2,) and (2, n); and (2, n) and (2, n); but not (2, n) and (2,)."""
-    xyz0 = latlon2xyz(p0)
-    xyz1 = latlon2xyz(p1)
-    return anglexyz(xyz0, xyz1)
+    combinations (2,) and (2,); (2,) and (2, n); and (2, n) and (2, n); but not (2, n) and (2,).
+    """
+    lat0, lon0 = p0
+    lat1, lon1 = p1
+    h2 = sind((lat1 - lat0) / 2.) ** 2 + cosd(lat1) * cosd(lat0) * sind((lon1 - lon0) / 2.) ** 2
+    return 2 * arcsind(np.sqrt(h2))
 

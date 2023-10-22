@@ -3,7 +3,18 @@ import matplotlib.pyplot as plt
 
 from Spherical.arc import Arc, Geodesic, PolyLine
 from Spherical import numerics
-from Spherical.functions import anglelatlon, SphericalGeometryError
+import Spherical.functions as fn
+
+
+def uniform_sample(n):
+    """Uniformly sample latitudes and longitudes"""
+    lons = np.random.rand(n) * 360 - 180
+    lats = []
+    while len(lats) < n:
+        lat = np.random.rand() * 180 - 90
+        if np.random.rand() < fn.cosd(lat):
+            lats.append(lat)
+    return np.array([lats, lons])
 
 
 def plotarc(arc: Arc, **kwargs):
@@ -13,21 +24,29 @@ def plotarc(arc: Arc, **kwargs):
     plt.ylim((-90, 90))
 
 
+def test_polyline_rejection():
+    """Should never reject a triangle!"""
+    for _ in range(100):
+        try:
+            points = uniform_sample(3)
+            pl = PolyLine(points)
+        except fn.SphericalGeometryError as sge:
+            pl = PolyLine(points)   # try again for debugging purposes
+
+
 def test_polyline_appearance():
     n_sides = 6
     n_tries = 0
 
     while True:
         try:
-            lats = np.random.rand(n_sides) * 180 - 90
-            lons = np.random.rand(n_sides) * 360 - 180
-            points = np.array([lats, lons]).T
+            points = uniform_sample(n_sides)
             pl = PolyLine(points)
             plotarc(pl, s=1)
             plt.title(fr"PolyLine after {n_tries} random tries")
             plt.show()
             break
-        except SphericalGeometryError:
+        except fn.SphericalGeometryError:
             n_tries += 1
             continue
 
@@ -42,7 +61,7 @@ def test_nearest_to_pole():
         geo = Geodesic((lats[0], lons[0]), (lats[1], lons[1]))
         tm, dm = geo.nearest((lats[2], lons[2]))
         geoplot = geo(np.linspace(0, geo.length()))
-        dists = anglelatlon((lats[2], lons[2]), geoplot)
+        dists = fn.anglelatlon((lats[2], lons[2]), geoplot)
         if (dists < dm - numerics.default_tol).any():
             plt.scatter(geoplot[1], geoplot[0], c=dists, s=5)
             plotarc(Geodesic(geo(tm), (90, 0)), c='black', s=1)
