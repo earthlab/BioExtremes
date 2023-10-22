@@ -7,55 +7,8 @@ from typing import Iterable
 
 import numpy as np
 
-from Geometry import numerics
-
-
-# trig in degrees
-sind = lambda x: np.sin(x * np.pi / 180)
-cosd = lambda x: np.cos(x * np.pi / 180)
-arctan2d = lambda opp, adj: np.arctan2(opp, adj) * 180 / np.pi
-arcsind = lambda x: np.arcsin(x) * 180 / np.pi
-arccosd = lambda x: np.arccos(x) * 180 / np.pi
-
-
-def latlon2xyz(coords: tuple | np.ndarray) -> np.ndarray:
-    """
-    :param coords: coordinates to convert to Cartesian, shape (2,) or (2, n)
-    :return: converted coordinates on unit sphere, shape (3,) or (3, n)
-    """
-    lat, lon = coords
-    x = cosd(lat) * cosd(lon)
-    y = cosd(lat) * sind(lon)
-    z = sind(lat)
-    return np.array([x, y, z])
-
-
-def xyz2latlon(xyz: tuple | np.ndarray) -> np.ndarray:
-    """
-    :param xyz: coordinates to convert to lat/lon, shape (3,) or (3, n)
-    :return: converted coordinates, shape (2,) or (2, n)
-    """
-    x, y, z = xyz
-    lon = arctan2d(y, x)
-    lat = arcsind(z / np.sqrt(x ** 2 + y ** 2 + z ** 2))
-    return np.array([lat, lon])
-
-
-def anglexyz(xyz0: np.ndarray, xyz1: np.ndarray) -> np.ndarray | float:
-    """
-    Compute the angle in degrees between two 3d vectors using the cosine formula. Supports shape combinations
-    (3,) and (3,); (3,) and (3, n); and (3, n) and (3, n); but not (3, n) and (3,).
-    """
-    return arccosd(xyz0 @ xyz1)
-
-
-def anglelatlon(p0: np.ndarray, p1: np.ndarray) -> np.ndarray | float:
-    """
-    Compute the angle in degrees between two unit vectors in (lat, lon) spherical coordinates. Supports shape
-    combinations (2,) and (2,); (2,) and (2, n); and (2, n) and (2, n); but not (2, n) and (2,)."""
-    xyz0 = latlon2xyz(p0)
-    xyz1 = latlon2xyz(p1)
-    return anglexyz(xyz0, xyz1)
+from Spherical import numerics
+from Spherical import functions as fn
 
 
 class Arc(ABC):
@@ -70,9 +23,9 @@ class Arc(ABC):
         """Check whether t is a valid input to the arc-length parameterization, i.e. 0 <= t <= length."""
         t = np.array(t)
         if (t > self.length()).any():
-            raise ValueError("Arc-length parameterization does not admit parameters t > length")
+            raise fn.SphericalGeometryError("Arc-length parameterization does not admit parameters t > length")
         if (t < 0).any():
-            raise ValueError("Arc-length parameterization does not admit parameters t < 0")
+            raise fn.SphericalGeometryError("Arc-length parameterization does not admit parameters t < 0")
 
     @abstractmethod
     def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
@@ -97,7 +50,7 @@ class Arc(ABC):
         :return: lat, lon coordinates of parameterization, shape (2,) or (2, n)
         """
         xyzt = self.xyz(t)
-        return xyz2latlon(xyzt)
+        return fn.xyz2latlon(xyzt)
 
     @abstractmethod
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
@@ -131,11 +84,11 @@ class Geodesic(Arc):
     def __init__(self, source: tuple, dest: tuple, _warn=True):
         self.source = np.array(source)
         self.dest = np.array(dest)
-        self._xyz0 = latlon2xyz(source)
-        xyz1 = latlon2xyz(dest)
-        self._angle = anglexyz(self._xyz0, xyz1)
+        self._xyz0 = fn.latlon2xyz(source)
+        xyz1 = fn.latlon2xyz(dest)
+        self._angle = fn.anglexyz(self._xyz0, xyz1)
         if _warn and self._angle >= 180 - numerics.default_tol:
-            raise RuntimeWarning("Geodesics defined by near-antipodal vertices are numerically unstable.")
+            raise fn.SphericalGeometryError("Geodesics defined by near-antipodal vertices are numerically unstable.")
         self._axis = np.cross(self._xyz0, xyz1)
         self._axis /= np.linalg.norm(self._axis)
         self._orthonormal = np.cross(self._axis, self._xyz0)
@@ -148,8 +101,8 @@ class Geodesic(Arc):
 
     def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
         if isinstance(t, np.ndarray):
-            return np.outer(self._xyz0, cosd(t)) + np.outer(self._orthonormal, sind(t))
-        return self._xyz0 * cosd(t) + self._orthonormal * sind(t)
+            return np.outer(self._xyz0, fn.cosd(t)) + np.outer(self._orthonormal, fn.sind(t))
+        return self._xyz0 * fn.cosd(t) + self._orthonormal * fn.sind(t)
 
     def _intersectsgc(self, gc, atol) -> tuple | None:
         """
@@ -180,11 +133,11 @@ class Geodesic(Arc):
         raise NotImplementedError(fr"Cannot compute intersections between Geodesic and {type(other)}")
 
     def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
-        xyz = latlon2xyz(point)
+        xyz = fn.latlon2xyz(point)
 
         def distance(t):
             xyzt = self.xyz(t)
-            return anglexyz(xyz, xyzt)
+            return fn.anglexyz(xyz, xyzt)
 
         # NOTE: golden section search returns a global minimizer here,
         # even though the distance may have two local minima!
@@ -203,16 +156,20 @@ class SimplePiecewiseArc(Arc):
         """
         self.arcs = arcs
         self._atol = atol
-        self._len = np.array([sum(arcs[:i]) for i in range(len(arcs))])
+        self._len = np.array([
+            sum([arc.length() for arc in arcs[:i]])
+            for i in range(len(arcs))
+        ])
         self.checkcontinuity()
         self.checksimplicity()
 
     def checkcontinuity(self):
         """Raise a ValueError if this curve is not continuous."""
         for arc1, arc2 in zip(self.arcs[:-1], self.arcs[1:]):
-            err = anglelatlon(arc1(arc1.length()), arc2(0))
+            err = fn.anglelatlon(arc1(arc1.length()), arc2(0))
             if err > self._atol:
-                raise ValueError(fr"SimplePiecewiseArc is discontinuous at seam with tolerace {self._atol}")
+                raise fn.SphericalGeometryError(
+                    fr"SimplePiecewiseArc is discontinuous at seam with tolerace {self._atol}.")
 
     def checksimplicity(self):
         """Raise a ValueError if this is not a simple curve, i.e. it intersects itself."""
@@ -224,19 +181,19 @@ class SimplePiecewiseArc(Arc):
                         continue
                     if j == len(self.arcs) - 1 and int.shape[1] == 1 and self.isclosed():
                         continue
-                    raise ValueError(fr"SimplePiecewiseArc crosses itself with tolerance {self._atol}")
+                    raise fn.SphericalGeometryError(fr"SimplePiecewiseArc crosses itself with tolerance {self._atol}.")
 
     def isclosed(self) -> bool:
         """Return whether the curve is closed."""
         arc1 = self.arcs[0]
         arcn = self.arcs[-1]
-        dist = anglelatlon(arcn(arcn.length()), arc1(0))
+        dist = fn.anglelatlon(arcn(arcn.length()), arc1(0))
         return dist < self._atol
 
     def contains(self, point: tuple) -> bool:
         """Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation."""
         if not self.isclosed():
-            raise Warning("containment check for a non-closed curve")
+            raise fn.SphericalGeometryError("Containment check for a non-closed curve.")
         raise NotImplementedError("")
 
     """Implement abstract methods of base class Arc"""
@@ -245,10 +202,17 @@ class SimplePiecewiseArc(Arc):
         return sum([arc.length() for arc in self.arcs])
 
     def _uncheckedxyz(self, t: float | np.ndarray) -> np.ndarray:
-        idx = sum(t >= self._len) - 1
-        arc = self.arcs[idx]
-        s = self._len[idx]
-        return arc(t - s)
+        s = np.atleast_1d(t)
+        compare = np.subtract.outer(s, self._len) >= 0
+        idx = compare.sum(axis=1) - 1
+        s -= self._len[idx]
+        result = np.empty((3, s.shape[0]))
+        for i in range(len(self.arcs)):
+            where_i = np.argwhere(idx == i)[:, 0]
+            result[:, where_i] = self.arcs[i].xyz(s[where_i])
+        if result.shape[1] == 1:
+            result.reshape(-1)
+        return result
 
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         raise NotImplementedError("")
@@ -260,14 +224,14 @@ class SimplePiecewiseArc(Arc):
 class PolyLine(SimplePiecewiseArc):
     """The oriented boundary of a spherical polygon."""
 
-    def __init__(self, vertices: list[tuple]):
+    def __init__(self, vertices: list[tuple], atol: float = numerics.default_tol):
         """
         Construct a PolyLine from a counterclockwise-ordered sequence of (lat, lon) vertices. The last edge is
         between vertices[-1] and vertices[0].
         """
         sides = [Geodesic(p0, p1) for p0, p1 in zip(vertices[:-1], vertices[1:])]
         sides.append(Geodesic(vertices[-1], vertices[0]))
-        super.__init__(sides)
+        super().__init__(sides, atol)
 
 
 

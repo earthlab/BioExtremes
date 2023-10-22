@@ -1,23 +1,35 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Geometry.spherical import Geodesic, anglelatlon
-from Geometry import numerics
+from Spherical.arc import Arc, Geodesic, PolyLine
+from Spherical import numerics
+from Spherical.functions import anglelatlon, SphericalGeometryError
 
 
-def plotgeo(geo: Geodesic, c, lbl=""):
-    # lat0, lon0 = geo.source
-    # lat1, lon1 = geo.dest
-    # plt.scatter([lon0, lon1], [lat0, lat1], c=c, label=lbl)
-    latlon = geo(np.linspace(0, geo.length(), 500))
-    plt.scatter(latlon[1], latlon[0], s=1, c=c)
+def plotarc(arc: Arc, **kwargs):
+    latlon = arc(np.linspace(0, arc.length(), 500))
+    plt.scatter(latlon[1], latlon[0], **kwargs)
     plt.xlim((-180, 180))
     plt.ylim((-90, 90))
 
 
-def test_spa_appearance():
-    # TODO: plot some SimplePiecewiseArcs--maybe SimplePiecewiseGeodesics?
-    pass
+def test_polyline_appearance():
+    n_sides = 6
+    n_tries = 0
+
+    while True:
+        try:
+            lats = np.random.rand(n_sides) * 180 - 90
+            lons = np.random.rand(n_sides) * 360 - 180
+            points = np.array([lats, lons]).T
+            pl = PolyLine(points)
+            plotarc(pl, s=1)
+            plt.title(fr"PolyLine after {n_tries} random tries")
+            plt.show()
+            break
+        except SphericalGeometryError:
+            n_tries += 1
+            continue
 
 
 def test_nearest_to_pole():
@@ -33,7 +45,7 @@ def test_nearest_to_pole():
         dists = anglelatlon((lats[2], lons[2]), geoplot)
         if (dists < dm - numerics.default_tol).any():
             plt.scatter(geoplot[1], geoplot[0], c=dists, s=5)
-            plotgeo(Geodesic(geo(tm), (90, 0)), c='black')
+            plotarc(Geodesic(geo(tm), (90, 0)), c='black', s=1)
             plt.show()
             failed = True
             break
@@ -47,9 +59,9 @@ def test_nearest_to_geo():
     params = [geo.nearest(p)[0] for p in points]
     nearest = [geo(t) for t in params]
     geos = [Geodesic(p, n) for p, n in zip(points, nearest)]
-    plotgeo(geo, c='red')
+    plotarc(geo, c='red', s=1)
     for g in geos:
-        plotgeo(g, c='black')
+        plotarc(g, c='black', s=1)
     plt.show()
 
 
@@ -84,7 +96,7 @@ def test_geodesic_appearance():
         (geo89, 'purple', 'near pole'),
         (geoab, 'black', 'single point')
     ]:
-        plotgeo(geoij, color, label)
+        plotarc(geoij, s=1, c=color, label=label)
 
     """PLOT INTERSECTIONS"""
 

@@ -25,7 +25,7 @@ def cart2latlon(x, y, z):
 
 class GlobalGeodesic:
     """
-    A parameterization g of the geodesic between two points on the Earth, such that g(0) is the starting point and
+    A parameterization g of the geodesic between two vertices on the Earth, such that g(0) is the starting point and
     g(1) is the ending point. Returns lat, lon as a tuple.
     TODO: constant speed parameterization?
     """
@@ -54,7 +54,7 @@ def gch_intersects_region(
         seed: int = 1
 ) -> bool:
     """
-    Return true with high probability if the geodesically convex hull of a set of (lat, lon) points intersects a
+    Return true with high probability if the geodesically convex hull of a set of (lat, lon) vertices intersects a
     region. Return false if the intersection is empty.
 
     :param points: Each row is [lat, lon], in degrees.
