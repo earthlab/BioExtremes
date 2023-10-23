@@ -3,7 +3,7 @@
 import numpy as np
 
 
-class SphericalGeometryError(Exception):
+class SphericalGeometryException(Exception):
     """Exception thrown by spherical geometry routines."""
     def __init__(self, message: str):
         super().__init__(message)

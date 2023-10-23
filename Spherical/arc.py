@@ -23,14 +23,13 @@ class Arc(ABC):
         """Check whether t is a valid input to the arc-length parameterization, i.e. 0 <= t <= length."""
         t = np.array(t)
         if (t > self.length()).any():
-            raise fn.SphericalGeometryError("Arc-length parameterization does not admit parameters t > length")
+            raise fn.SphericalGeometryException("Arc-length parameterization does not admit parameters t > length")
         if (t < 0).any():
-            raise fn.SphericalGeometryError("Arc-length parameterization does not admit parameters t < 0")
+            raise fn.SphericalGeometryException("Arc-length parameterization does not admit parameters t < 0")
 
     @abstractmethod
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
         """xyz(t) without checking t"""
-        pass
 
     def xyz(self, t: float | np.ndarray) -> np.ndarray:
         """
@@ -57,6 +56,17 @@ class Arc(ABC):
         return fn.xyz2latlon(xyzt)
 
     @abstractmethod
+    def _intersections(self, other, atol: float) -> np.ndarray:
+        """
+        Called by public method with the same name. Raises a SphericalGeometryException if other is an unrecognized
+        implementation of Arc.
+
+        :type other: Arc
+        :param other: Another Arc to intersect.
+        :param atol: Error tolerance, in degrees.
+        :return: The array of intersections, with shape (2, n), or None if no intersections occur.
+        """
+
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         """
         Return a numpy array of the (lat, lon) points at which this arc intersects another, up to a tolerance.
@@ -67,7 +77,11 @@ class Arc(ABC):
         :param atol: Error tolerance, in degrees.
         :return: The array of intersections, with shape (2, n), or None if no intersections occur.
         """
-        pass
+        # TODO: Exceptions shouldn't be raised unless something is WRONG--make it work differently
+        try:
+            return self._intersections(other, atol)
+        except fn.SphericalGeometryException:
+            return other._intersections(self, atol)
 
     @abstractmethod
     def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
@@ -79,26 +93,33 @@ class Arc(ABC):
         :return: t, d, where t is the parameter value of the nearest point, and d is the distance in radii to the
                     nearest point.
         """
-        pass
 
 
 class Geodesic(Arc):
     """An Arc representing the shortest path between two points."""
 
-    def __init__(self, source: tuple, dest: tuple, _warn=True):
+    def __init__(self, source: tuple | np.ndarray, dest: tuple | np.ndarray, warn=True):
+        """
+        Construct a Geodesic shortest path.
+
+        :param source: start of path
+        :param dest: end of path
+        :param warn: causes SphericalGeometryException if source and dest are antipodal, in which case the shortest
+                        path is not unique, and intersections computed with the Geodesic will be untrustworthy.
+        """
         self.source = np.array(source)
         self.dest = np.array(dest)
         self._xyz0 = fn.latlon2xyz(source)
         self._xyz1 = fn.latlon2xyz(dest)
         self._angle = fn.anglexyz(self._xyz0, self._xyz1)
-        if _warn and self._angle >= 180 - numerics.default_tol:
-            raise fn.SphericalGeometryError("Geodesics defined by near-antipodal points are numerically unstable.")
-        if self._angle == 0:
+        if warn and self._angle >= 180 - numerics.default_tol:
+            raise fn.SphericalGeometryException("Geodesics defined by near-antipodal points are numerically unstable.")
+        self._axis = np.cross(self._xyz0, self._xyz1)
+        if (self._axis == 0).all():
             # axis and orthonormal are arbitrary in this case
             self._axis = np.array([1, 0, 0])
             self._orthonormal = np.array([0, 1, 1])
         else:
-            self._axis = np.cross(self._xyz0, self._xyz1)
             self._axis /= np.linalg.norm(self._axis)
             self._orthonormal = np.cross(self._axis, self._xyz0)
             self._orthonormal /= np.linalg.norm(self._orthonormal)
@@ -121,15 +142,15 @@ class Geodesic(Arc):
         if tint is not None:
             return self(tint)
 
-    def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
+    def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         if isinstance(other, Geodesic):
-            p0 = self._intersectsgc(other, atol / (2 * np.pi))
+            p0 = self._intersectsgc(other, atol)
             if p0 is None:
                 return
-            p1 = other._intersectsgc(self, atol / (2 * np.pi))
+            p1 = other._intersectsgc(self, atol)
             if p1 is None:
                 return
-            geo = Geodesic(p0, p1, _warn=False)
+            geo = Geodesic(p0, p1, warn=False)
             dist = geo.length()
             if dist < atol:
                 return np.array([geo(dist / 2)]).T     # return midpoint of path between intersections
@@ -164,20 +185,21 @@ class SimplePiecewiseArc(Arc):
             sum([arc.length() for arc in arcs[:i]])
             for i in range(len(arcs))
         ])
+        if np.unique(self._sublen).shape != self._sublen.shape:
+            raise fn.SphericalGeometryException("SimplePiecewiseArc may not include length-zero Arcs.")
         self._len = self._sublen[-1] + arcs[-1].length()
         self.checkcontinuity()
         self.checksimplicity()
-        # get interior point for containment checks
-        if self.isclosed():
-            side = arcs[0]
-            p0 = side
+        # TODO: get reference point for containment queries properly
+        self._refpt = (0.0001234, -0.0004321)   # hopefully doesn't lie on a great circle containing one of self.arcs!
+        self._refoutside = False
 
     def checkcontinuity(self):
         """Raise an exception if this curve is not continuous."""
         for arc1, arc2 in zip(self.arcs[:-1], self.arcs[1:]):
             err = fn.anglelatlon(arc1(arc1.length()), arc2(0))
             if err > self._atol:
-                raise fn.SphericalGeometryError(
+                raise fn.SphericalGeometryException(
                     f"SimplePiecewiseArc is discontinuous at seam with tolerace {self._atol}.")
 
     def checksimplicity(self):
@@ -190,7 +212,7 @@ class SimplePiecewiseArc(Arc):
                         continue
                     if j == 0 and i == len(self.arcs) - 1 and ints.shape[1] == 1 and self.isclosed():
                         continue
-                    raise fn.SphericalGeometryError(f"SimplePiecewiseArc crosses itself with tolerance {self._atol}.")
+                    raise fn.SphericalGeometryException(f"SimplePiecewiseArc crosses itself with tolerance {self._atol}.")
 
     def isclosed(self) -> bool:
         """Return whether the curve is closed."""
@@ -202,8 +224,11 @@ class SimplePiecewiseArc(Arc):
     def contains(self, point: tuple) -> bool:
         """Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation."""
         if not self.isclosed():
-            raise fn.SphericalGeometryError("Containment check for a non-closed curve.")
-        raise NotImplementedError("")
+            raise fn.SphericalGeometryException("Containment check for a non-closed curve.")
+        path = Geodesic(point, self._refpt, warn=False)
+        ints = self.intersections(path)
+        nints = 0 if ints is None else ints.shape[1]
+        return (nints + self._refoutside) % 2
 
     """Implement abstract methods of base class Arc"""
 
@@ -223,8 +248,11 @@ class SimplePiecewiseArc(Arc):
             result[:, where_i] = self.arcs[i].xyz(ti)
         return result
 
-    def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
-        raise NotImplementedError("")
+    def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
+        ints = [arc.intersections(other) for arc in self.arcs]
+        ints = np.unique([i for i in ints if i is not None], axis=0)
+        if ints.shape[0]:
+            return np.hstack(ints)
 
     def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
         td = np.array([arc.nearest(point, atol) for arc in self.arcs])
