@@ -173,12 +173,12 @@ class SimplePiecewiseArc(Arc):
 
     def __init__(self, arcs: list[Arc], atol: float = numerics.default_tol):
         """
-        Initiate a SimplePiecewiseArc from a list of arcs.
+        Initiate a SimplePiecewiseArc from a list of Arcs.
 
         :param arcs: List of Arcs, each of which starts at the end of the previous.
         :param atol: Continuity is enforced up to this tolerance, in degrees.
         """
-        self.arcs = arcs
+        self._arcs = arcs
         self._atol = atol
         self._sublen = np.array([
             sum([arc.length() for arc in arcs[:i]])
@@ -187,15 +187,24 @@ class SimplePiecewiseArc(Arc):
         if np.unique(self._sublen).shape != self._sublen.shape:
             raise fn.SphericalGeometryException("SimplePiecewiseArc may not include length-zero Arcs.")
         self._len = self._sublen[-1] + arcs[-1].length()
+
+        # determine closedness
+        arc1 = self._arcs[0]
+        arcn = self._arcs[-1]
+        dist = fn.anglelatlon(arcn(arcn.length()), arc1(0))
+        self._closed = dist < self._atol
+
+        # is this a valid simple curve?
         self.checkcontinuity()
         self.checksimplicity()
-        # TODO: get reference point for containment queries properly
-        self._refpt = (0.0001234, -0.0004321)   # hopefully doesn't lie on a great circle containing one of self.arcs!
-        self._refinside = True
+
+        # establish reference p for containment queries
+        self._refpt = (0.0001234, -0.0004321)   # hopefully doesn't lie on a great circle containing one of self._arcs!
+        self._refinside = self.contains(self._refpt, method='angles')
 
     def checkcontinuity(self):
         """Raise an exception if this curve is not continuous."""
-        for arc1, arc2 in zip(self.arcs[:-1], self.arcs[1:]):
+        for arc1, arc2 in zip(self._arcs[:-1], self._arcs[1:]):
             err = fn.anglelatlon(arc1(arc1.length()), arc2(0))
             if err > self._atol:
                 raise fn.SphericalGeometryException(
@@ -203,36 +212,58 @@ class SimplePiecewiseArc(Arc):
 
     def checksimplicity(self):
         """Raise an exception if this is not a simple curve, i.e. it intersects itself."""
-        for i in range(len(self.arcs)):
+        for i in range(len(self._arcs)):
             for j in range(i):
-                ints = self.arcs[i].intersections(self.arcs[j], atol=self._atol)
+                ints = self._arcs[i].intersections(self._arcs[j], atol=self._atol)
                 if ints is not None:
                     if j == i - 1 and ints.shape[1] == 1:       # allowed to intersect end of previous arc
                         continue
-                    if j == 0 and i == len(self.arcs) - 1 and ints.shape[1] == 1 and self.isclosed():
+                    if j == 0 and i == len(self._arcs) - 1 and ints.shape[1] == 1 and self.isclosed():
                         continue
                     raise fn.SphericalGeometryException(f"SimplePiecewiseArc crosses itself with tolerance {self._atol}.")
 
     def isclosed(self) -> bool:
         """Return whether the curve is closed."""
-        arc1 = self.arcs[0]
-        arcn = self.arcs[-1]
-        dist = fn.anglelatlon(arcn(arcn.length()), arc1(0))
-        return dist < self._atol
+        return self._closed
 
-    def contains(self, point: tuple) -> bool:
-        """Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation."""
+    def contains(self, point: tuple, method: str = 'refpt') -> bool:
+        """
+        Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation. If method='refpt',
+        the default, then containment is determined by counting the intersections between the Arc and a Geodesic
+        connecting the queried p to a reference p. If method='angles', then containment is determined by
+        comparing angles between the shortest path to the Arc and the counterclockwise and clockwise tangents.
+        The 'refpt' method is faster, but fails in some probability-zero cases, e.g. if the query point is coplanar
+        with a Geodesic side of the closed curve.
+        """
         if not self.isclosed():
             raise fn.SphericalGeometryException("Containment check for a non-closed curve.")
+        if method == 'angles':
+            return self._anglesmethod(point)
+        if method != 'refpt':
+            raise ValueError(f"Invalid method for containment check: {method}")
         path = Geodesic(point, self._refpt, warn=False)
         if path.length() >= 180 - self._atol:     # break long geodesic in parts for accurate intersections
             path = SimplePiecewiseArc([
                 Geodesic(path(0), path(90)),
                 Geodesic(path(90), path(path.length()))
             ])
-        ints = self.intersections(path)
+        ints = self.intersections(path, self._atol)
         nints = 0 if ints is None else ints.shape[1]
         return bool((nints + self._refinside) % 2)
+
+    def _anglesmethod(self, p: tuple) -> bool:
+        """Perform a containment test using the angle comparison method. Does not require a reference point."""
+        t, _ = self.nearest(p)
+        q = self(t)                                             # nearest point on boundary
+        qp = Geodesic(q, p)
+        q = fn.latlon2xyz(q)
+        n = qp.xyz(min(numerics.default_tol, qp.length())) - q  # normal at q in direction of p
+        dt = min(numerics.default_tol, 0.4 * self._len)
+        tf = (t + dt) % self._len
+        f = self.xyz(tf) - q                                    # forward tangent at q
+        tb = (t - dt) % self._len
+        b = self.xyz(tb) - q                                    # backward tangent at q
+        return np.cross(n, f) @ q > np.cross(n, b) @ q
 
     """Implement abstract methods of base class Arc"""
 
@@ -244,22 +275,22 @@ class SimplePiecewiseArc(Arc):
         idx = compare.sum(axis=1) - 1
         t -= self._sublen[idx]
         result = np.empty((3, t.shape[0]))
-        for i in range(len(self.arcs)):
+        for i in range(len(self._arcs)):
             where_i = np.argwhere(idx == i)[:, 0]
             ti = t[where_i]
             ti[ti < 0] = 0  # round off numerical errors outside allowed range
-            ti[ti > self.arcs[i].length()] = self.arcs[i].length()
-            result[:, where_i] = self.arcs[i].xyz(ti)
+            ti[ti > self._arcs[i].length()] = self._arcs[i].length()
+            result[:, where_i] = self._arcs[i].xyz(ti)
         return result
 
     def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
-        ints = [arc.intersections(other) for arc in self.arcs]
+        ints = [arc.intersections(other, atol) for arc in self._arcs]
         ints = np.unique([i for i in ints if i is not None], axis=0)
         if ints.shape[0]:
             return np.hstack(ints)
 
     def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
-        td = np.array([arc.nearest(point, atol) for arc in self.arcs])
+        td = np.array([arc.nearest(point, atol) for arc in self._arcs])
         t = td[:, 0] + self._sublen
         d = td[:, 1]
         idx = np.argmin(d)
@@ -267,7 +298,7 @@ class SimplePiecewiseArc(Arc):
 
 
 class PolyLine(SimplePiecewiseArc):
-    """The oriented boundary of a spherical polygon."""
+    """The counterclockwise-oriented boundary of a spherical polygon."""
 
     def __init__(self, points: np.ndarray, atol: float = numerics.default_tol):
         """Construct a PolyLine from a counterclockwise-ordered sequence of (lat, lon) points with shape (2, n)."""
