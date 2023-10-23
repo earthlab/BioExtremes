@@ -107,8 +107,6 @@ class Geodesic(Arc):
         :param warn: causes SphericalGeometryException if source and dest are antipodal, in which case the shortest
                         path is not unique, and intersections computed with the Geodesic will be untrustworthy.
         """
-        self.source = np.array(source)
-        self.dest = np.array(dest)
         self._xyz0 = fn.latlon2xyz(source)
         self._xyz1 = fn.latlon2xyz(dest)
         self._angle = fn.anglexyz(self._xyz0, self._xyz1)
@@ -130,17 +128,18 @@ class Geodesic(Arc):
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
         return np.outer(self._xyz0, fn.cosd(t)) + np.outer(self._orthonormal, fn.sind(t))
 
-    def _intersectsgc(self, gc, atol) -> tuple | None:
+    def _intersectsgc(self, gc, atol: float) -> np.ndarray | None:
         """
         Return where this geodesic intersects the great circle containing another geodesic gc.
 
         :type gc: Geodesic
         """
-        axis = fn.xyz2latlon(gc._axis)
-        anglefromgc = lambda t: fn.anglelatlon(self(t), axis) - 90.
-        tint = numerics.bisection(anglefromgc, a=0, b=self._angle, ftol=atol)
-        if tint is not None:
-            return self(tint)
+        d0 = gc._axis @ self._xyz0
+        d1 = gc._axis @ self._xyz1
+        if d0 * d1 <= 0.5 * atol:
+            inplane = d0 * self._xyz1 - d1 * self._xyz0
+            inplane *= inplane @ (self._xyz0 + self._xyz1)
+            return fn.xyz2latlon(inplane)
 
     def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         if isinstance(other, Geodesic):
@@ -192,7 +191,7 @@ class SimplePiecewiseArc(Arc):
         self.checksimplicity()
         # TODO: get reference point for containment queries properly
         self._refpt = (0.0001234, -0.0004321)   # hopefully doesn't lie on a great circle containing one of self.arcs!
-        self._refoutside = False
+        self._refinside = True
 
     def checkcontinuity(self):
         """Raise an exception if this curve is not continuous."""
@@ -226,9 +225,14 @@ class SimplePiecewiseArc(Arc):
         if not self.isclosed():
             raise fn.SphericalGeometryException("Containment check for a non-closed curve.")
         path = Geodesic(point, self._refpt, warn=False)
+        if path.length() >= 180 - self._atol:     # break long geodesic in parts for accurate intersections
+            path = SimplePiecewiseArc([
+                Geodesic(path(0), path(90)),
+                Geodesic(path(90), path(path.length()))
+            ])
         ints = self.intersections(path)
         nints = 0 if ints is None else ints.shape[1]
-        return (nints + self._refoutside) % 2
+        return bool((nints + self._refinside) % 2)
 
     """Implement abstract methods of base class Arc"""
 

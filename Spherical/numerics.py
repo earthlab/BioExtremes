@@ -4,45 +4,8 @@ Implements basic rootfinding and convex optimization schemes for spherical geome
 from typing import Callable
 import numpy as np
 
-default_tol = np.sqrt(np.finfo(float).eps)
-
-
-def bisection(
-        f: Callable[[float], float],
-        a: float,
-        b: float,
-        ftol: float = default_tol,
-        fa=None,
-        fb=None
-) -> float | None:
-    """
-    Use the bisection method to estimate a root of f on the interval [a, b]. The root must exist and be unique.
-
-    :param f: function for rootfinding
-    :param a: lower bound
-    :param b: upper bound
-    :param ftol: tolerance for absolute value of f at solution
-    :param fa: optionally f(a)
-    :param fb: optionally f(b)
-    :return: the approximate root, or None if no root is found
-    """
-    midpoint = (a + b) / 2
-    fm = f(midpoint)
-    if np.abs(fm) < ftol:
-        return midpoint
-    fa = fa if fa is not None else f(a)
-    if np.abs(fa) < ftol:
-        return a
-    fb = fb if fb is not None else f(b)
-    if np.abs(fb) < ftol:
-        return b
-    if fa * fm < 0:
-        return bisection(f, a=a, b=midpoint, ftol=ftol, fa=fa, fb=fm)
-    if fm * fb <= 0:
-        return bisection(f, a=midpoint, b=b, ftol=ftol, fa=fm, fb=fb)
-
-
-invgr = (np.sqrt(5) - 1) / 2    # inverted golden ratio
+default_tol = np.sqrt(np.finfo(float).eps)      # half of max precision
+invgr = (np.sqrt(5) - 1) / 2                    # inverted golden ratio
 
 
 def goldensection(

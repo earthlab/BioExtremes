@@ -24,13 +24,48 @@ def plotarc(arc: Arc, **kwargs):
     plt.ylim((-90, 90))
 
 
-def test_polyline_nearest():
+def test_polyline_contains_appearance():
     points = np.array([
         [45, -22, -22],
         [0, -90, 90]
     ])
     pl = PolyLine(points)
     res = 20
+    latplot = np.linspace(-90, 90, res)
+    lonplot = np.linspace(-180, 180, 2 * res)
+    color = []
+    x = []
+    y = []
+    # check grid of points
+    for lat in latplot:
+        for lon in lonplot:
+            i = pl.contains((lat, lon))
+            color.append('white' if i else 'black')
+            x.append(lon)
+            y.append(lat)
+    # check ref point and antipode
+    lat, lon = pl._refpt
+    i = pl.contains((lat, lon))
+    x.append(lon)
+    y.append(lat)
+    color.append('white' if i else 'black')
+    lat, lon = -lat, (lon + 180) % 360 - 180
+    i = pl.contains((lat, lon))
+    x.append(lon)
+    y.append(lat)
+    color.append('white' if i else 'black')
+    plt.scatter(x, y, c=color)
+    plotarc(pl, color='red')
+    plt.show()
+
+
+def test_polyline_nearest():
+    points = np.array([
+        [45, -22, -22],
+        [0, -90, 90]
+    ])
+    pl = PolyLine(points)
+    res = 10
     latplot = np.linspace(-90, 90, res)
     lonplot = np.linspace(-180, 180, 2 * res)
     dists = []
@@ -53,7 +88,7 @@ def test_polyline_rejection():
         try:
             points = uniform_sample(3)
             pl = PolyLine(points)
-        except fn.SphericalGeometryError as sge:
+        except fn.SphericalGeometryException as sge:
             pl = PolyLine(points)   # try again for debugging purposes
 
 
@@ -70,7 +105,7 @@ def test_polyline_appearance():
             plt.title(fr"PolyLine after {n_tries} random tries")
             plt.show()
             break
-        except fn.SphericalGeometryError:
+        except fn.SphericalGeometryException:
             continue
 
 
