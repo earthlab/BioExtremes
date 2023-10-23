@@ -93,10 +93,15 @@ class Geodesic(Arc):
         self._angle = fn.anglexyz(self._xyz0, self._xyz1)
         if _warn and self._angle >= 180 - numerics.default_tol:
             raise fn.SphericalGeometryError("Geodesics defined by near-antipodal points are numerically unstable.")
-        self._axis = np.cross(self._xyz0, self._xyz1)
-        self._axis /= np.linalg.norm(self._axis)
-        self._orthonormal = np.cross(self._axis, self._xyz0)
-        self._orthonormal /= np.linalg.norm(self._orthonormal)
+        if self._angle == 0:
+            # axis and orthonormal are arbitrary in this case
+            self._axis = np.array([1, 0, 0])
+            self._orthonormal = np.array([0, 1, 1])
+        else:
+            self._axis = np.cross(self._xyz0, self._xyz1)
+            self._axis /= np.linalg.norm(self._axis)
+            self._orthonormal = np.cross(self._axis, self._xyz0)
+            self._orthonormal /= np.linalg.norm(self._orthonormal)
 
     def length(self) -> float:
         return self._angle
@@ -110,10 +115,9 @@ class Geodesic(Arc):
 
         :type gc: Geodesic
         """
-        def anglefromgc(t):
-            xyz = self.xyz(t)
-            return xyz @ gc._axis
-        tint = numerics.bisection(anglefromgc, a=0, b=self._angle, atol=atol)
+        axis = fn.xyz2latlon(gc._axis)
+        anglefromgc = lambda t: fn.anglelatlon(self(t), axis) - 90.
+        tint = numerics.bisection(anglefromgc, a=0, b=self._angle, ftol=atol)
         if tint is not None:
             return self(tint)
 
@@ -163,6 +167,10 @@ class SimplePiecewiseArc(Arc):
         self._len = self._sublen[-1] + arcs[-1].length()
         self.checkcontinuity()
         self.checksimplicity()
+        # get interior point for containment checks
+        if self.isclosed():
+            side = arcs[0]
+            p0 = side
 
     def checkcontinuity(self):
         """Raise an exception if this curve is not continuous."""

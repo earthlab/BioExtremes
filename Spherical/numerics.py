@@ -11,7 +11,7 @@ def bisection(
         f: Callable[[float], float],
         a: float,
         b: float,
-        atol: float = default_tol,
+        ftol: float = default_tol,
         fa=None,
         fb=None
 ) -> float | None:
@@ -21,21 +21,25 @@ def bisection(
     :param f: function for rootfinding
     :param a: lower bound
     :param b: upper bound
-    :param atol: absolute tolerance
+    :param ftol: tolerance for absolute value of f at solution
     :param fa: optionally f(a)
     :param fb: optionally f(b)
     :return: the approximate root, or None if no root is found
     """
     midpoint = (a + b) / 2
-    if b - a < atol:
+    fm = f(midpoint)
+    if np.abs(fm) < ftol:
         return midpoint
     fa = fa if fa is not None else f(a)
+    if np.abs(fa) < ftol:
+        return a
     fb = fb if fb is not None else f(b)
-    fm = f(midpoint)
+    if np.abs(fb) < ftol:
+        return b
     if fa * fm < 0:
-        return bisection(f, a=a, b=midpoint, atol=atol, fa=fa, fb=fm)
+        return bisection(f, a=a, b=midpoint, ftol=ftol, fa=fa, fb=fm)
     if fm * fb <= 0:
-        return bisection(f, a=midpoint, b=b, atol=atol, fa=fm, fb=fb)
+        return bisection(f, a=midpoint, b=b, ftol=ftol, fa=fm, fb=fb)
 
 
 invgr = (np.sqrt(5) - 1) / 2    # inverted golden ratio
