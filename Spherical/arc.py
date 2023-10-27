@@ -1,10 +1,6 @@
-"""
-This module implements a variety of spherical geometry algorithms.
-"""
+"""This module implements a variety of parameterized simple curves on the sphere."""
 
 from abc import abstractmethod, ABC
-from typing import Iterable
-
 import numpy as np
 
 from Spherical import numerics
@@ -70,7 +66,8 @@ class Arc(ABC):
     def intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
         """
         Return a numpy array of the (lat, lon) points at which this arc intersects another, up to a tolerance.
-        Note that this array may be empty.
+        Note that this array may be empty, and will omit infinitely many points of intersection wherever the two arcs
+        coincide.
 
         :type other: Arc
         :param other: Another Arc to intersect.
@@ -83,16 +80,23 @@ class Arc(ABC):
         except fn.SphericalGeometryException:
             return other._intersections(self, atol)
 
-    @abstractmethod
-    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple[float]:
+    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
         """
-        Nearest-point calculation.
+        Greedy nearest-point calculation, using golden section search, which works for a Geodesic or part of a
+        Parallel, but may need to be overridden for sophisticated Arcs.
 
         :param point: query point (lat, lon)
         :param atol: error tolerance
         :return: t, d, where t is the parameter value of the nearest point, and d is the distance in radii to the
                     nearest point.
         """
+        xyz = fn.latlon2xyz(point)
+
+        def distance(t):
+            xyzt = self.xyz(t)
+            return fn.anglexyz(xyz, xyzt)
+
+        return numerics.goldensection(distance, a=0, b=self._angle, atol=atol)
 
 
 class Geodesic(Arc):
@@ -154,18 +158,107 @@ class Geodesic(Arc):
             if dist < atol:
                 return np.array([geo(dist / 2)]).T     # return midpoint of path between intersections
             return
-        raise NotImplementedError(fr"Cannot compute intersections between Geodesic and {type(other)}")
+        raise fn.SphericalGeometryException(f"Cannot compute intersections between Geodesic and {type(other)}")
 
-    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
-        xyz = fn.latlon2xyz(point)
 
-        def distance(t):
-            xyzt = self.xyz(t)
-            return fn.anglexyz(xyz, xyzt)
+class Parallel(Arc):
+    """Part of a latitude line."""
 
-        # NOTE: golden section search returns a global minimizer here,
-        # even though the distance may have two local minima!
-        return numerics.goldensection(distance, a=0, b=self._angle, atol=atol)
+    def __init__(self, lat: float, lon0: float, lon1: float, crossdl: bool = False):
+        """
+        Construct a Parallel.
+
+        :param lat: latitude
+        :param lon0: starting longitude
+        :param lon1: ending longitude
+        :param crossdl: whether to cross the International Date Line, False by default
+        """
+        self._lat = lat
+        self._lon0 = lon0
+        self._lon1 = lon1
+        self._crossdl = crossdl
+        self._dlon = lon1 - lon0
+        self._dsdlon = fn.cosd(lat) * np.sign(self._dlon)    # signed equatorial degrees per signed degree longitude
+        self._lonrange = (min(lon0, lon1), max(lon0, lon1))
+        if crossdl:
+            self._dlon = -np.sign(self._dlon) * (360 - np.abs(self._dlon))
+            self._lonrange = (max(lon0, lon1), min(lon0, lon1))
+        self._len = np.abs(self._dsdlon * self._dlon)
+
+    def length(self) -> float:
+        return self._len
+
+    # override inherited call method because here it is more natural to work in spherical coordinates
+    def __call__(self, t: float | np.ndarray) -> np.ndarray:
+        """
+        Unit-speed parameterization of the Parallel's spherical coordinates in (equatorial) degrees. This means that
+        longitude changes at a speed of cosine(latitude).
+
+        :param t: shape (,) or (n,)
+        :return: lat, lon coordinates of parameterization, shape (2,) or (2, n)
+        """
+        self._checkt(t)
+        lon = (self._lon0 + t * self._dsdlon + 180) % 360 - 180
+        lat = self._lat * np.ones_like(lon)
+        return np.array([lat, lon])
+
+    def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
+        return fn.latlon2xyz(self(t))
+
+    def _inlonrange(self, lon) -> bool:
+        """Return whether a longitude value lies in the range of this Parallel."""
+        a, b = self._lonrange
+        if self._crossdl:
+            return lon >= a or lon <= b
+        return a <= lon <= b
+
+    def _intersections(self, other, atol: float) -> np.ndarray:
+        if isinstance(other, Parallel):
+            if self._lat == other._lat:
+                a, b = self._lonrange
+                mn = min(other._lon0, other._lon1)
+                mx = max(other._lon0, other._lon1)
+                ints = []
+                if self._crossdl:
+                    if mn <= a:
+                        ints.append(np.array([self._lat, mn]))
+                    if mx >= b:
+                        ints.append(np.array([self._lat, mx]))
+                else:
+                    if a <= mn <= b:
+                        ints.append(np.array([self._lat, mn]))
+                    if a <= mx <= b:
+                        ints.append(np.array([self._lat, mx]))
+                if -a == mx == 180 or b == -mn == 180:
+                    ints.append(np.array([self._lat, -180]))
+                ints = np.array(ints)
+                ints[:, 1] = (ints[:, 1] + 180) % 360 - 180
+                ints = np.unique(ints, axis=0).T
+                if ints.shape[0]:
+                    return ints
+            return
+        if isinstance(other, Geodesic):
+            sgn = np.sign(self._lat)
+            minimize = lambda s: -sgn * other(s)[0]
+            findroot = lambda s: other(s)[0] - self._lat
+            t_split, extreme = numerics.goldensection(minimize, a=0, b=other.length(), atol=atol)
+            latstart, latextreme, latend = other(np.array([0, t_split, other.length()]))[0]
+            ints = []
+            if latstart <= self._lat <= latextreme or latextreme <= self._lat <= latstart:
+                t1 = numerics.bisection(findroot, a=0, b=t_split, atol=atol)
+                lat, lon = other(t1)
+                if self._inlonrange(lon):
+                    ints.append((lat, lon))
+            if latend < self._lat < latextreme or latextreme < self._lat < latend:      # strict < helps at equator
+                t2 = numerics.bisection(findroot, a=t_split, b=other.length(), atol=atol)
+                lat, lon = other(t2)
+                if self._inlonrange(lon):
+                    ints.append((lat, lon))
+            ints = np.unique(ints, axis=0).T
+            if ints.shape[0]:
+                return ints
+            return
+        raise fn.SphericalGeometryException(f"Cannot compute intersection between Parallel and {type(other)}")
 
 
 class SimplePiecewiseArc(Arc):
@@ -253,23 +346,26 @@ class SimplePiecewiseArc(Arc):
 
     def _anglesmethod(self, p: tuple) -> bool:
         """Perform a containment test using the angle comparison method. Does not require a reference point."""
-        t, _ = self.nearest(p)
+        t, d = self.nearest(p)
+        if d < self._atol:
+            return True                                         # include boundary of closed shape
         q = self(t)                                             # nearest point on boundary
         qp = Geodesic(q, p)
         q = fn.latlon2xyz(q)
-        n = qp.xyz(min(numerics.default_tol, qp.length())) - q  # normal at q in direction of p
-        dt = min(numerics.default_tol, 0.4 * self._len)
+        n = qp.xyz(self._atol) - q            # normal at q in direction of p
+        dt = min(self._atol, 0.4 * self._len)
         tf = (t + dt) % self._len
         f = self.xyz(tf) - q                                    # forward tangent at q
         tb = (t - dt) % self._len
         b = self.xyz(tb) - q                                    # backward tangent at q
-        return np.cross(n, f) @ q > np.cross(n, b) @ q
+        return np.cross(n, f) @ q >= np.cross(n, b) @ q         # weak inequality for closed shape
 
     """Implement abstract methods of base class Arc"""
 
     def length(self) -> float:
         return self._len
 
+    # TODO: really ought to override __call__() to avoid converting in and out of xyz for Parallels
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
         compare = np.subtract.outer(t, self._sublen) >= 0
         idx = compare.sum(axis=1) - 1
@@ -280,7 +376,7 @@ class SimplePiecewiseArc(Arc):
             ti = t[where_i]
             ti[ti < 0] = 0  # round off numerical errors outside allowed range
             ti[ti > self._arcs[i].length()] = self._arcs[i].length()
-            result[:, where_i] = self._arcs[i].xyz(ti)
+            result[:, where_i] = self._arcs[i]._uncheckedxyz(ti)
         return result
 
     def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
@@ -289,7 +385,17 @@ class SimplePiecewiseArc(Arc):
         if ints.shape[0]:
             return np.hstack(ints)
 
+    # TODO: override decorator?
     def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
+        """
+        Nearest-point calculation involves calling nearest() method of each constituent Arc. Overridden from base
+        class Arc.
+
+        :param point: query point (lat, lon)
+        :param atol: error tolerance
+        :return: t, d, where t is the parameter value of the nearest point, and d is the distance in radii to the
+                    nearest point.
+        """
         td = np.array([arc.nearest(point, atol) for arc in self._arcs])
         t = td[:, 0] + self._sublen
         d = td[:, 1]
@@ -297,15 +403,44 @@ class SimplePiecewiseArc(Arc):
         return t[idx], d[idx]
 
 
-class PolyLine(SimplePiecewiseArc):
+class Polygon(SimplePiecewiseArc):
     """The counterclockwise-oriented boundary of a spherical polygon."""
 
-    def __init__(self, points: np.ndarray, atol: float = numerics.default_tol):
-        """Construct a PolyLine from a counterclockwise-ordered sequence of (lat, lon) points with shape (2, n)."""
+    def __init__(self, points: np.array, atol: float = numerics.default_tol):
+        """Construct a Polygon from a counterclockwise-ordered sequence of (lat, lon) points with shape (2, n)."""
         verts = points.T
         sides = [Geodesic(p0, p1) for p0, p1 in zip(verts[:-1], verts[1:])]
         sides.append(Geodesic(verts[-1], verts[0]))
         super().__init__(sides, atol)
 
+
+class BoundingBox(SimplePiecewiseArc):
+    """A lat/lon bounding box on the sphere."""
+
+    def __init__(self, topleft: tuple, bottomright: tuple):
+        """
+        Create a bounding box from its two corners.
+
+        :param topleft: (lat, lon) northwest corner
+        :param bottomright: (lat, lon) southeast corner
+        """
+        self._maxlat, self._minlon = topleft
+        self._minlat, self._maxlon = bottomright
+        self._crossdl = self._minlon > self._maxlon
+        super().__init__([                                          # counterclockwise orientation
+            Geodesic(topleft, (self._minlat, self._minlon)),
+            Parallel(self._minlat, lon0=self._minlon, lon1=self._maxlon, crossdl=self._crossdl),
+            Geodesic(bottomright, (self._maxlat, self._maxlon)),
+            Parallel(self._maxlat, lon0=self._maxlon, lon1=self._minlon, crossdl=self._crossdl)
+        ])
+
+    def contains(self, point: tuple, method="gets ignored") -> bool:
+        """Returns whether a (lat, lon) point is inside the BoundingBox. Overrides SimplePiecewiseArc.contains()."""
+        lat, lon = point
+        if not self._minlat <= lat <= self._maxlat:
+            return False
+        if self._minlon <= lon <= self._maxlon:
+            return not self._crossdl
+        return self._crossdl
 
 

@@ -8,6 +8,39 @@ default_tol = np.sqrt(np.finfo(float).eps)      # half of max precision
 invgr = (np.sqrt(5) - 1) / 2                    # inverted golden ratio
 
 
+def bisection(
+        f: Callable[[float], float],
+        a: float,
+        b: float,
+        atol: float = default_tol,
+        fa=None,
+        fb=None
+) -> float | None:
+    """
+    Use the bisection method to estimate a root of f on the interval [a, b]. The root must exist and be unique.
+
+    :param f: function for rootfinding
+    :param a: lower bound
+    :param b: upper bound
+    :param atol: absolute tolerance
+    :param fa: optionally f(a)
+    :param fb: optionally f(b)
+    :return: the approximate root, or None if no root is found
+    """
+    m = (a + b) / 2
+    fa = fa if fa is not None else f(a)
+    fb = fb if fb is not None else f(b)
+    fm = f(m)
+    # base case: return mid- or endpoint closest to root
+    if b - a < atol:
+        return [a, m, b][np.argmin(np.abs([fa, fm, fb]))]
+    # recursive case: search for root on subinterval
+    if fa * fm < 0:
+        return bisection(f, a=a, b=m, atol=atol, fa=fa, fb=fm)
+    if fm * fb <= 0:
+        return bisection(f, a=m, b=b, atol=atol, fa=fm, fb=fb)
+
+
 def goldensection(
         f: Callable[[float], float],
         a: float,

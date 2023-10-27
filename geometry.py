@@ -9,7 +9,7 @@ arcsind = lambda x: np.arcsin(x) * 180 / np.pi
 
 
 def latlon2cart(lat, lon):
-    """Return Cartesian coordinates of a point on the globe where distance units are Earth radius."""
+    """Return Cartesian coordinates of a p on the globe where distance units are Earth radius."""
     x = cosd(lat) * cosd(lon)
     y = cosd(lat) * sind(lon)
     z = sind(lat)
@@ -17,7 +17,7 @@ def latlon2cart(lat, lon):
 
 
 def cart2latlon(x, y, z):
-    """Returns latitutude and longitude of a Cartesian point."""
+    """Returns latitutude and longitude of a Cartesian p."""
     lon = arctan2d(y, x)
     lat = arcsind(z / np.sqrt(x ** 2 + y ** 2 + z ** 2))
     return lat, lon
@@ -25,8 +25,8 @@ def cart2latlon(x, y, z):
 
 class GlobalGeodesic:
     """
-    A parameterization g of the geodesic between two points on the Earth, such that g(0) is the starting point and
-    g(1) is the ending point. Returns lat, lon as a tuple.
+    A parameterization g of the geodesic between two points on the Earth, such that g(0) is the starting p and
+    g(1) is the ending p. Returns lat, lon as a tuple.
     TODO: constant speed parameterization?
     """
 

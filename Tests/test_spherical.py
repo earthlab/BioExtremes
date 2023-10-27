@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Spherical.arc import Arc, Geodesic, PolyLine
+from Spherical.arc import Arc, Geodesic, Polygon, Parallel, BoundingBox
 from Spherical import numerics
 import Spherical.functions as fn
 
@@ -24,12 +24,65 @@ def plotarc(arc: Arc, **kwargs):
     plt.ylim((-90, 90))
 
 
+def test_bb_poly_intersection():
+    poly = Polygon(np.array([
+        [35, -10, -50, 0, 35],
+        [-40, -10, 40, 25, 7]
+    ]))
+    bb = BoundingBox((0, -20), (50, -55))
+    plotarc(poly, label='Polygon')
+    plotarc(bb, label="Bounding Box")
+    plt.show()
+
+
+def test_parallel_intersects():
+    par1 = Parallel(lat=0, lon0=0, lon1=-180)                   # western equator
+    par2 = Parallel(lat=0, lon0=0, lon1=180)                    # eastern equator
+    assert par1.intersections(par2).shape == (2, 2)
+    geo1 = Geodesic((0, 0), (0, 100))                           # part of equator
+    assert par1.intersections(geo1).shape == (2, 1)
+    assert geo1.intersections(par2).shape == (2, 1)
+    par3 = Parallel(lat=90, lon0=-180, lon1=180, crossdl=True)  # North Pole
+    assert par3.intersections(par1) is None
+    assert geo1.intersections(par3) is None
+    assert par3.intersections(par3).shape == (2, 1)
+    geo2 = Geodesic((70, -20), (40, 160))                       # thru pole
+    assert geo2.intersections(par3).shape == (2, 1)
+    par4 = Parallel(lat=-30, lon0=-15, lon1=15, crossdl=True)   # most of the way around
+    geo3 = Geodesic((-10, 40), (-55, 65))                       # crosses only par4, only once
+    assert par4.intersections(geo3).shape == (2, 1)
+    assert geo3.intersections(par2) is None
+    geo4 = Geodesic((-28, -140), (-28, 140))                    # crosses only par4, twice
+    assert par4.intersections(geo4).shape == (2, 2)
+    par5 = Parallel(lat=-55, lon0=60, lon1=70)                  # crosses tip of geo3
+    assert par5.intersections(geo3).shape == (2, 1)
+    par6 = Parallel(lat=-30, lon0=-10, lon1=10)                 # inside convex hull of geo4
+    assert par6.intersections(geo4) is None
+
+
+def test_parallel_appearance():
+    par1 = Parallel(lat=60, lon0=-45, lon1=45)
+    par2 = Parallel(lat=0, lon0=130, lon1=2)
+    par3 = Parallel(lat=-30, lon0=-90, lon1=90, crossdl=True)
+    par4 = Parallel(lat=-90, lon0=-180, lon1=180)
+    for arc, lbl in [
+        (par1, "arctic"),
+        (par2, "equatorial"),
+        (par3, "crosses IDL"),
+        (par4, "south pole")
+    ]:
+        plotarc(arc, label=lbl)
+    plt.ylim((-90, 90))
+    plt.legend()
+    plt.show()
+
+
 def test_polyline_contains_appearance():
     points = np.array([
         [45, -22, -22],
         [0, -90, 90]
     ])
-    pl = PolyLine(points)
+    pl = Polygon(points)
     res = 20
     latplot = np.linspace(-90, 90, res)
     lonplot = np.linspace(-180, 180, 2 * res)
@@ -43,7 +96,7 @@ def test_polyline_contains_appearance():
             color.append('white' if i else 'black')
             x.append(lon)
             y.append(lat)
-    # check ref point and antipode
+    # check ref p and antipode
     lat, lon = pl._refpt
     i = pl.contains((lat, lon))
     x.append(lon)
@@ -59,13 +112,48 @@ def test_polyline_contains_appearance():
     plt.show()
 
 
+def test_polyline_contains_angles():
+    points = np.array([
+        [45, -22, -22],
+        [0, -90, 90]
+    ])
+    pl = Polygon(points)
+    res = 6
+    latplot = np.linspace(-90, 90, res)
+    lonplot = np.linspace(-180, 180, 2 * res)
+    color = []
+    x = []
+    y = []
+    # check grid of points
+    for lat in latplot:
+        for lon in lonplot:
+            i = pl.contains((lat, lon), method='angles')
+            color.append('white' if i else 'black')
+            x.append(lon)
+            y.append(lat)
+    # check ref p and antipode
+    lat, lon = pl._refpt
+    i = pl.contains((lat, lon))
+    x.append(lon)
+    y.append(lat)
+    color.append('white' if i else 'black')
+    lat, lon = -lat, (lon + 180) % 360 - 180
+    i = pl.contains((lat, lon), method='angles')
+    x.append(lon)
+    y.append(lat)
+    color.append('white' if i else 'black')
+    plt.scatter(x, y, c=color)
+    plotarc(pl, color='red')
+    plt.show()
+
+
 def test_polyline_nearest():
     points = np.array([
         [45, -22, -22],
         [0, -90, 90]
     ])
-    pl = PolyLine(points)
-    res = 10
+    pl = Polygon(points)
+    res = 30
     latplot = np.linspace(-90, 90, res)
     lonplot = np.linspace(-180, 180, 2 * res)
     dists = []
@@ -87,9 +175,9 @@ def test_polyline_rejection():
     for _ in range(500):
         try:
             points = uniform_sample(3)
-            pl = PolyLine(points)
+            pl = Polygon(points)
         except fn.SphericalGeometryException as sge:
-            pl = PolyLine(points)   # try again for debugging purposes
+            pl = Polygon(points)   # try again for debugging purposes
 
 
 def test_polyline_appearance():
@@ -100,7 +188,7 @@ def test_polyline_appearance():
         try:
             n_tries += 1
             points = uniform_sample(n_sides)
-            pl = PolyLine(points)
+            pl = Polygon(points)
             plotarc(pl, s=1)
             plt.title(fr"PolyLine after {n_tries} random tries")
             plt.show()
@@ -161,7 +249,7 @@ def test_geodesic_appearance():
     geo89 = Geodesic(p8, p9)        # near pole
     pa = (-30, 140)
     pb = (-30, 140)
-    geoab = Geodesic(pa, pb)        # single point
+    geoab = Geodesic(pa, pb)        # single p
 
     """PLOT CURVES"""
 
@@ -171,7 +259,7 @@ def test_geodesic_appearance():
         (geo45, 'green', 'random'),
         (geo67, 'blue', 'partial equator'),
         (geo89, 'purple', 'near pole'),
-        (geoab, 'black', 'single point')
+        (geoab, 'black', 'single p')
     ]:
         plotarc(geoij, s=1, c=color, label=label)
 
