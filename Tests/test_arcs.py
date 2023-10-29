@@ -74,7 +74,6 @@ def test_parallel_appearance():
         (par4, "south pole")
     ]:
         plotarc(arc, label=lbl)
-    plt.ylim((-90, 90))
     plt.legend()
     plt.show()
 
@@ -82,7 +81,7 @@ def test_parallel_appearance():
 def test_polyline_contains_appearance():
     points = np.array([
         [45, -22, -22],
-        [0, -90, 90]
+        [0, -80, 80]
     ])
     pl = Polygon(points)
     res = 20
@@ -95,7 +94,7 @@ def test_polyline_contains_appearance():
     for lat in latplot:
         for lon in lonplot:
             i = pl.contains((lat, lon))
-            color.append('white' if i else 'black')
+            color.append('black' if i else 'white')
             x.append(lon)
             y.append(lat)
     # check ref p and antipode
@@ -103,12 +102,12 @@ def test_polyline_contains_appearance():
     i = pl.contains((lat, lon))
     x.append(lon)
     y.append(lat)
-    color.append('white' if i else 'black')
+    color.append('black' if i else 'white')
     lat, lon = -lat, (lon + 180) % 360 - 180
     i = pl.contains((lat, lon))
     x.append(lon)
     y.append(lat)
-    color.append('white' if i else 'black')
+    color.append('black' if i else 'white')
     plt.scatter(x, y, c=color)
     plotarc(pl, color='red')
     plt.show()
@@ -130,7 +129,7 @@ def test_polyline_contains_angles():
     for lat in latplot:
         for lon in lonplot:
             i = pl.contains((lat, lon), method='angles')
-            color.append('white' if i else 'black')
+            color.append('black' if i else 'white')
             x.append(lon)
             y.append(lat)
     # check ref p and antipode
@@ -138,12 +137,12 @@ def test_polyline_contains_angles():
     i = pl.contains((lat, lon))
     x.append(lon)
     y.append(lat)
-    color.append('white' if i else 'black')
+    color.append('black' if i else 'white')
     lat, lon = -lat, (lon + 180) % 360 - 180
     i = pl.contains((lat, lon), method='angles')
     x.append(lon)
     y.append(lat)
-    color.append('white' if i else 'black')
+    color.append('black' if i else 'white')
     plt.scatter(x, y, c=color)
     plotarc(pl, color='red')
     plt.show()

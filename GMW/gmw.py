@@ -8,11 +8,11 @@ import rasterio
 from geometry import gch_intersects_region      # TODO: don't use this
 
 
-def tiles_intersecting_region(gmwdir: str, spatial_predicate: Callable[[tuple], bool]) -> list[str]:
+def tiles_intersecting_region(gmwdir: str, spatial_predicate: Callable[[tuple], bool] = None) -> list[str]:
     """
     Get the names of 1x1 degree tiles which intersect a region of interest.
     :param gmwdir: Path to directory of GMW archive data, e.g. "/location/of/gmw_v3_2020/"
-    :param spatial_predicate: Boolean function of lat, lon defining region
+    :param spatial_predicate: Boolean function of lat, lon defining region. Can be None.
     :return: List of tile geotiff files of interest, e.g. ["GMW_S38E146_2020_v3.tif", "GMW_S38E145_2020_v3.tif"]
     """
     result = []
@@ -28,7 +28,7 @@ def tiles_intersecting_region(gmwdir: str, spatial_predicate: Callable[[tuple], 
         else:
             lon = -int(lon.group(1))
         corners = [[lat, lon], [lat - 1, lon], [lat - 1, lon + 1], [lat, lon + 1]]
-        if gch_intersects_region(corners, spatial_predicate):
+        if spatial_predicate is None or gch_intersects_region(corners, spatial_predicate):
             result.append(tilename)
     return result
 

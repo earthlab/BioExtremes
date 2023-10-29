@@ -80,7 +80,7 @@ class Arc(ABC):
         except fn.SphericalGeometryException:
             return other._intersections(self, atol)
 
-    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
+    def nearest(self, point: tuple | np.ndarray, atol: float = numerics.default_tol) -> tuple:
         """
         Greedy nearest-point calculation, using golden section search, which works for a Geodesic or part of a
         Parallel, but may need to be overridden for sophisticated Arcs.
@@ -319,7 +319,7 @@ class SimplePiecewiseArc(Arc):
         """Return whether the curve is closed."""
         return self._closed
 
-    def contains(self, point: tuple, method: str = 'refpt') -> bool:
+    def contains(self, point: tuple | np.ndarray, method: str = 'refpt') -> bool:
         """
         Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation. If method='refpt',
         the default, then containment is determined by counting the intersections between the Arc and a Geodesic
@@ -344,7 +344,7 @@ class SimplePiecewiseArc(Arc):
         nints = 0 if ints is None else ints.shape[1]
         return bool((nints + self._refinside) % 2)
 
-    def distance(self, p: tuple) -> float:
+    def distance(self, p: tuple | np.ndarray) -> float:
         """
         Return the distance from a point to the region enclosed by the curve, accurate within absolute tolerance.
         Unlike nearest(), this method returns a distance of 0 for any point inside the curve. Whether the point is
@@ -392,7 +392,7 @@ class SimplePiecewiseArc(Arc):
             return np.hstack(ints)
 
     # TODO: override decorator?
-    def nearest(self, point: tuple, atol: float = numerics.default_tol) -> tuple:
+    def nearest(self, point: tuple | np.ndarray, atol: float = numerics.default_tol) -> tuple:
         """
         Nearest-point calculation involves calling nearest() method of each constituent Arc. Overridden from base
         class Arc.
