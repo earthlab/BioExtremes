@@ -1,6 +1,7 @@
 """
 Implements basic rootfinding and convex optimization schemes for spherical geometry.
 """
+
 from typing import Callable
 import numpy as np
 

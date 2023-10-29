@@ -35,6 +35,7 @@ def test_bb_poly_intersection():
     plt.show()
 
 
+# TODO: parallel bug fixes
 def test_parallel_intersects():
     par1 = Parallel(lat=0, lon0=0, lon1=-180)                   # western equator
     par2 = Parallel(lat=0, lon0=0, lon1=180)                    # eastern equator
@@ -60,6 +61,7 @@ def test_parallel_intersects():
     assert par6.intersections(geo4) is None
 
 
+# TODO: parallel bug fixes
 def test_parallel_appearance():
     par1 = Parallel(lat=60, lon0=-45, lon1=45)
     par2 = Parallel(lat=0, lon0=130, lon1=2)
@@ -181,7 +183,7 @@ def test_polyline_rejection():
 
 
 def test_polyline_appearance():
-    n_sides = 9
+    n_sides = 6
     n_tries = 0
 
     while True:
@@ -189,12 +191,26 @@ def test_polyline_appearance():
             n_tries += 1
             points = uniform_sample(n_sides)
             pl = Polygon(points)
-            plotarc(pl, s=1)
-            plt.title(fr"PolyLine after {n_tries} random tries")
-            plt.show()
             break
         except fn.SphericalGeometryException:
             continue
+
+    res = 20
+    latplot = np.linspace(-90, 90, res)
+    lonplot = np.linspace(-180, 180, 2 * res)
+    color = []
+    x = []
+    y = []
+    # check grid of points
+    for lat in latplot:
+        for lon in lonplot:
+            i = pl.contains((lat, lon))
+            color.append('white' if i else 'black')
+            x.append(lon)
+            y.append(lat)
+    plt.scatter(x, y, c=color)
+    plotarc(pl, color='red', s=1)
+    plt.show()
 
 
 def test_nearest_to_pole():

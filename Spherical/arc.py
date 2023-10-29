@@ -331,7 +331,7 @@ class SimplePiecewiseArc(Arc):
         if not self.isclosed():
             raise fn.SphericalGeometryException("Containment check for a non-closed curve.")
         if method == 'angles':
-            return self._anglesmethod(point)
+            return self.distance(point) == 0.
         if method != 'refpt':
             raise ValueError(f"Invalid method for containment check: {method}")
         path = Geodesic(point, self._refpt, warn=False)
@@ -344,21 +344,27 @@ class SimplePiecewiseArc(Arc):
         nints = 0 if ints is None else ints.shape[1]
         return bool((nints + self._refinside) % 2)
 
-    def _anglesmethod(self, p: tuple) -> bool:
-        """Perform a containment test using the angle comparison method. Does not require a reference point."""
+    def distance(self, p: tuple) -> float:
+        """
+        Return the distance from a point to the region enclosed by the curve, accurate within absolute tolerance.
+        Unlike nearest(), this method returns a distance of 0 for any point inside the curve. Whether the point is
+        inside is determined using angle comparison.
+        """
         t, d = self.nearest(p)
         if d < self._atol:
-            return True                                         # include boundary of closed shape
+            return 0.                                           # include boundary of closed shape
         q = self(t)                                             # nearest point on boundary
         qp = Geodesic(q, p)
         q = fn.latlon2xyz(q)
-        n = qp.xyz(self._atol) - q            # normal at q in direction of p
+        n = qp.xyz(self._atol) - q                              # normal at q in direction of p
         dt = min(self._atol, 0.4 * self._len)
         tf = (t + dt) % self._len
         f = self.xyz(tf) - q                                    # forward tangent at q
         tb = (t - dt) % self._len
         b = self.xyz(tb) - q                                    # backward tangent at q
-        return np.cross(n, f) @ q >= np.cross(n, b) @ q         # weak inequality for closed shape
+        if np.cross(n, f) @ q <= np.cross(n, b) @ q:
+            return 0.
+        return d
 
     """Implement abstract methods of base class Arc"""
 
