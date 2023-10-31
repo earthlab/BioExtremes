@@ -9,9 +9,8 @@ from GEDI.api import L2AAPI
 from GEDI.granuleconstraint import RegionGC, CompositeGC
 
 
-gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"
-# gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
-nproc = os.cpu_count()
+gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
+# gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
 
 if __name__ == "__main__":
     freeze_support()

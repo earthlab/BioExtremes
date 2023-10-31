@@ -396,10 +396,11 @@ class SimplePiecewiseArc(Arc):
         return result
 
     def _intersections(self, other, atol: float = numerics.default_tol) -> np.ndarray:
-        ints = [arc.intersections(other, atol) for arc in self._arcs]
-        ints = np.unique([i for i in ints if i is not None], axis=0)
-        if ints.shape[0]:
-            return np.hstack(ints)
+        ints = [i for i in (arc.intersections(other, atol) for arc in self._arcs) if i is not None]
+        if ints:
+            ints = np.hstack(ints)
+            ints = np.unique(ints, axis=0)
+            return ints
 
     # TODO: override decorator?
     def nearest(self, point: tuple | np.ndarray, atol: float = numerics.default_tol) -> tuple:
