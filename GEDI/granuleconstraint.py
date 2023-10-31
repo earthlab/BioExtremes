@@ -8,8 +8,6 @@ from abc import abstractmethod, ABC
 
 from GEDI.api import GEDIAPI
 from Spherical.arc import Polygon, SimplePiecewiseArc
-from Spherical.functions import SphericalGeometryException
-from Spherical.neighbors import touchset, BallTree
 
 
 class GranuleConstraint(ABC):
@@ -51,32 +49,6 @@ class GranuleConstraint(ABC):
         return self._checkpoly(poly), url
 
 
-# TODO: ditch this its slow
-class BufferGC(GranuleConstraint):
-    """Accepts GEDI granules only whose bounding polygons are within some buffer of a finite point set."""
-
-    def __init__(self, api: GEDIAPI, tree: BallTree, buffer: float):
-        """
-        :param api: GEDIAPI object for data retrieval.
-        :param tree: BallTree, metric='haversine' object containing the buffered points.
-        :param buffer: granule Polygons must come within this distance of the point set to be accepted. Units are
-                        equatorial degrees.
-        """
-        self.tree = tree
-        self.buffer = buffer
-        super().__init__(api)
-
-    def __call__(self, url: str) -> tuple[str, str]:
-        try:
-            poly = self.getboundingpolygon(url)
-            d2poly = lambda p: np.radians(poly.distance(np.degrees(p)))
-            touch, _ = touchset(d2poly, self.tree, atol=float(np.radians(self.buffer)))
-            return 'accept' if touch else 'reject', url
-        except SphericalGeometryException:
-            return 'error', url
-
-
-# TODO:
 class RegionGC(GranuleConstraint):
     """Accepts GEDI granules only whose bounding polygons interest a region defined by a closed SimplePiecewiseArc."""
 
