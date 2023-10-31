@@ -15,17 +15,22 @@ class _TouchSet:
         self.data, self.index, self.nodes, _ = tree.get_arrays()
         self.d2set = d2set
         self.atol = atol
+        self.sttcalls = 0  # useful for debugging purposes
         self.touch, self.x = self.subtreetouch(0)
 
     def subtreetouch(self, root: int) -> tuple:
         """Determine whether a subtree touches the set."""
+        self.sttcalls += 1
         istart, iend, isleaf, rad = self.nodes[root]
         rep = self.data[self.index[istart]]
         # base case 1: reject if this subtree is bounded away from the set
         d = self.d2set(rep)
         if d > 2 * rad + self.atol:
             return False, rep
-        # base case 2: minimize over leaf by brute force
+        # base case 2: accept if representative is within tolerance of set
+        if d < self.atol:
+            return True, rep
+        # base case 3: minimize over leaf by brute force
         if isleaf:
             for x in self.data[self.index[istart:iend]]:
                 if self.d2set(x) < self.atol:

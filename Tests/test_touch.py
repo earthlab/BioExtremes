@@ -23,8 +23,8 @@ florida = Polygon(np.array([
 def test_touch_appearance():
     gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
     bounds = LatLonBox(minlat=24.85, maxlat=25.89, minlon=-81.52, maxlon=-80.39)
-    tilenames = gmw.tiles_intersecting_region(gmwdir, bounds.spatial_predicate)
-    points = gmw.mangrove_locations_from_tiles(gmwdir, tilenames)
+    tilenames = gmw.get_tile_names(gmwdir, bounds.spatial_predicate)
+    points = gmw.get_mangrove_locations_from_tiles(gmwdir, tilenames)
     tree = BallTree(np.radians(points))
     d2set = lambda p: np.radians(florida.distance(np.degrees(p)))
     touch, x = touchset(d2set, tree)

@@ -4,41 +4,116 @@ This module contains tools for determining whether a GEDI granule has data withi
 
 import numpy as np
 import re
+from abc import abstractmethod, ABC
 
-from GEDI.api import L2AAPI
-from geometry import gch_intersects_region  # TODO: stop using this; it's hacky and slow
+from GEDI.api import GEDIAPI
+from Spherical.arc import Polygon, SimplePiecewiseArc
+from Spherical.functions import SphericalGeometryException
+from Spherical.neighbors import touchset, BallTree
 
 
-class GranuleConstraint:
+class GranuleConstraint(ABC):
     """
     Functor used to apply granule-level constraints on GEDI data. Returns True for granules intersecting a region of
     interest.
     """
 
-    getxmlurl = lambda h5url: h5url + '.xml'
-
     @staticmethod
-    def _polyfromxmlfile(xmlfile):
+    def _polyfromxmlfile(xmlfile: str) -> Polygon:
         xml = str(xmlfile.getvalue())
         lons = [plon[16:-17] for plon in re.findall(r"<PointLongitude>-?\d*\.?\d+?</PointLongitude>", xml)]
         lats = [plon[15:-16] for plon in re.findall(r"<PointLatitude>-?\d*\.?\d+?</PointLatitude>", xml)]
-        points = np.vstack([lats, lons]).astype(float).T
-        return points
+        poly = np.array([lats, lons]).astype(float)
+        poly = Polygon(np.flip(poly, axis=1), checksimple=False)
+        return poly
 
-    @classmethod
-    def getboundingpolygon(cls, url) -> np.ndarray:
+    def getboundingpolygon(self, url) -> Polygon:
         """
-        :param url: Link to a granule's associated h5 file.
+        :param url: Link to a granule's associated xml file.
         :return: The bounding polygon of the granule listed by the xml file, as an ordered list of (lat, lon) points.
         """
-        l2a = L2AAPI()  # TODO: choose which API based on link contents
-        xmlurl = cls.getxmlurl(url)
-        return l2a.process_in_memory_file(xmlurl, cls._polyfromxmlfile)
+        return self.api.process_in_memory_file(url, self._polyfromxmlfile)
 
-    def __init__(self, spatial_predicate=lambda *args, **kwargs: True):
-        self._spacepred = spatial_predicate
+    def __init__(self, api: GEDIAPI):
+        """:param api: GEDIAPI object for data retrieval."""
+        self.api = api
 
-    def __call__(self, url):
-        points = self.getboundingpolygon(url)
-        return gch_intersects_region(points, self._spacepred)
+    @abstractmethod
+    def _checkpoly(self, poly: Polygon) -> bool:
+        """Apply the constraint to a granule's bounding polygon."""
 
+    def __call__(self, url: str) -> tuple[bool, str]:
+        """
+        Determine whether the granule, indicated by the url of its associated xml file, passes the constraint.
+        Return whether the granule passed, followed by the url itself.
+        """
+        poly = self.getboundingpolygon(url)
+        return self._checkpoly(poly), url
+
+
+# TODO: ditch this its slow
+class BufferGC(GranuleConstraint):
+    """Accepts GEDI granules only whose bounding polygons are within some buffer of a finite point set."""
+
+    def __init__(self, api: GEDIAPI, tree: BallTree, buffer: float):
+        """
+        :param api: GEDIAPI object for data retrieval.
+        :param tree: BallTree, metric='haversine' object containing the buffered points.
+        :param buffer: granule Polygons must come within this distance of the point set to be accepted. Units are
+                        equatorial degrees.
+        """
+        self.tree = tree
+        self.buffer = buffer
+        super().__init__(api)
+
+    def __call__(self, url: str) -> tuple[str, str]:
+        try:
+            poly = self.getboundingpolygon(url)
+            d2poly = lambda p: np.radians(poly.distance(np.degrees(p)))
+            touch, _ = touchset(d2poly, self.tree, atol=float(np.radians(self.buffer)))
+            return 'accept' if touch else 'reject', url
+        except SphericalGeometryException:
+            return 'error', url
+
+
+# TODO:
+class RegionGC(GranuleConstraint):
+    """Accepts GEDI granules only whose bounding polygons interest a region defined by a closed SimplePiecewiseArc."""
+
+    def __init__(self, region: SimplePiecewiseArc, api: GEDIAPI):
+        """
+        :param region: A SimplePiecewiseArc enclosing the region of interest
+        :param api: Used to obtain data from server
+        """
+        if not region.isclosed():
+            raise ValueError("Only a closed curve defines a region")
+        self.region = region
+        super().__init__(api)
+
+    def _checkpoly(self, poly: Polygon) -> bool:
+        if poly.intersections(self.region) is not None:
+            return True
+        if poly.contains(self.region(0)):
+            return True
+        if self.region.contains(poly(0)):
+            return True
+        return False
+
+
+class CompositeGC(GranuleConstraint):
+    """Accept based on an AND/OR of other GranuleConstraints."""
+
+    def __init__(self, constraints: list[GranuleConstraint], disjunction: bool):
+        """
+        :param constraints: a list of GranuleConstraint objects.
+        :param disjunction: boolean indicating whether to OR (True) or AND (False) the list of constraints.
+        """
+        self._gcs = constraints
+        self._or = disjunction
+        self.api = constraints[0].api
+
+    def _checkpoly(self, poly: Polygon) -> bool:
+        for gc in self._gcs:
+            if gc._checkpoly(poly) == self._or:
+                return self._or
+        return not self._or

@@ -152,7 +152,7 @@ def downloadandfilterurls(
     killed = False
     try:
         with Pool(nproc) as pool:
-            sequence = map(_processgranule, argslist)
+            sequence = pool.imap_unordered(_processgranule, argslist)
             if progess_bar:
                 sequence = tqdm(sequence, total=len(argslist))
             for df in sequence:

@@ -264,12 +264,20 @@ class Parallel(Arc):
 class SimplePiecewiseArc(Arc):
     """A continuous simple curve consisting of Arc segments."""
 
-    def __init__(self, arcs: list[Arc], atol: float = numerics.default_tol):
+    def __init__(
+            self,
+            arcs: list[Arc],
+            atol: float = numerics.default_tol,
+            checksimple: bool = True,
+            checkcontinuous: bool = True
+            ):
         """
         Initiate a SimplePiecewiseArc from a list of Arcs.
 
         :param arcs: List of Arcs, each of which starts at the end of the previous.
         :param atol: Continuity is enforced up to this tolerance, in degrees.
+        :param checksimple: whether to enforce that the curve is simple.
+        :param checkcontinuous: whether to enforce that the curve is continuous.
         """
         self._arcs = arcs
         self._atol = atol
@@ -288,8 +296,10 @@ class SimplePiecewiseArc(Arc):
         self._closed = dist < self._atol
 
         # is this a valid simple curve?
-        self.checkcontinuity()
-        self.checksimplicity()
+        if checkcontinuous:
+            self.checkcontinuity()
+        if checksimple:
+            self.checksimplicity()
 
         # establish reference p for containment queries
         self._refpt = (0.0001234, -0.0004321)   # hopefully doesn't lie on a great circle containing one of self._arcs!
@@ -412,12 +422,15 @@ class SimplePiecewiseArc(Arc):
 class Polygon(SimplePiecewiseArc):
     """The counterclockwise-oriented boundary of a spherical polygon."""
 
-    def __init__(self, points: np.array, atol: float = numerics.default_tol):
-        """Construct a Polygon from a counterclockwise-ordered sequence of (lat, lon) points with shape (2, n)."""
+    def __init__(self, points: np.array, **kwargs):
+        """
+        Construct a Polygon from a counterclockwise-ordered sequence of (lat, lon) points with shape (2, n).
+        Keyword arguments passed to SimplePiecewiseArc.__init__()
+        """
         verts = points.T
         sides = [Geodesic(p0, p1) for p0, p1 in zip(verts[:-1], verts[1:])]
         sides.append(Geodesic(verts[-1], verts[0]))
-        super().__init__(sides, atol)
+        super().__init__(sides, **kwargs)
 
 
 class BoundingBox(SimplePiecewiseArc):

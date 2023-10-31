@@ -28,7 +28,7 @@ def test_xml_polys_gmw():
         verts = GranuleConstraint.getboundingpolygon(link)
         poly = Polygon(np.flip(verts, axis=0).T)
         d2poly = lambda p: np.radians(poly.distance(np.degrees(p)))
-        touch, _ = touchset(d2poly, tree)
+        touch, _ = touchset(d2poly, tree, atol=np.radians(2))            # one degree tolerance
         plotarc(poly, s=0.5, c='green' if touch else 'red')
     plt.show()
 

@@ -9,7 +9,7 @@ from io import BytesIO
 from urllib.error import HTTPError
 
 import requests
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Iterator
 from http.cookiejar import CookieJar
 import getpass
 import re
@@ -35,6 +35,11 @@ class GEDIAPI:
         self._file_re = None
         self._tif_re = None
         self._dates = None
+
+    def check_credentials(self):
+        """Will raise a permissions error if unable to download."""
+        self.request_raw_data(
+            "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml")
 
     def request_raw_data(self, link: str):
         """
@@ -66,9 +71,9 @@ class GEDIAPI:
 
         :param link: webpage url
         :param func: Method which takes a file-like object as its first argument and performs the action.
-        :param args: Passed to f.
-        :param kwargs: Passed to f.
-        :return: Result of f([linked file], *args, **kwargs), or None if a memory error occurs.
+        :param args: Passed to func.
+        :param kwargs: Passed to func.
+        :return: Result of func([linked file], *args, **kwargs), or None if a memory error occurs.
         """
         response = self.request_raw_data(link)
         response.begin()
@@ -135,25 +140,22 @@ class GEDIAPI:
         return sorted(list(set([datetime.strptime(link, '%Y.%m.%d/') for link in links if re.match(date_re, link) is not
                                 None])))
 
-    def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> list[str]:
+    def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> Iterator[str]:
         """
-        Return the url of every file from a granule from between xyz0 and xyz1 dates (inclusive). Higher than daily
-        (e.g., hourly) precision for xyz0/xyz1 times is not available.
+        Yields the url of every file from a granule from between start and end dates (inclusive). Higher than daily
+        (e.g., hourly) precision for start/end times is not available.
 
         :param t_start: Start date.
         :param t_end: End date.
         :param suffix: Only yield urls ending in this string.
-        :return: List of file urls in the prescribed range.
         """
-        urls = []
         delta = t_end - t_start
         for nd in range(delta.days + 1):
             day = t_start + timedelta(days=nd)
             # TODO: code duplication from download_time_series()
             dayurl = urllib.parse.urljoin(self._BASE_URL, day.strftime('%Y') + '.' + day.strftime('%m') + '.' +
                                           day.strftime('%d') + '/')
-            urls += [dayurl + file for file in self.retrieve_links(dayurl, suffix)]
-        return urls
+            yield from (dayurl + file for file in self.retrieve_links(dayurl, suffix))
 
 
 class L2AAPI(GEDIAPI):

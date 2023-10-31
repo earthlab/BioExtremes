@@ -36,8 +36,8 @@ if __name__ == "__main__":
     gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"
     #gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
     print(f"Obtaining mangrove buffer from {gmwdir}...")
-    tilenames = gmw.tiles_intersecting_region(gmwdir, bounds.spatial_predicate)
-    points = gmw.mangrove_locations_from_tiles(gmwdir, tilenames)
+    tilenames = gmw.get_tile_names(gmwdir, bounds.spatial_predicate)
+    points = gmw.get_mangrove_locations_from_tiles(gmwdir, tilenames)
 
     downloadandfilterurls(
         urls,

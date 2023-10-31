@@ -6,9 +6,34 @@ import numpy as np
 import rasterio
 
 from geometry import gch_intersects_region      # TODO: don't use this
+from Spherical.arc import Polygon, BoundingBox
 
 
-def tiles_intersecting_region(gmwdir: str, spatial_predicate: Callable[[tuple], bool] = None) -> list[str]:
+def get_tile_corners(tilename: str) -> np.ndarray:
+    """
+    Parse the corner coordinates (counterclockwise) from the tilename, e.g.
+    "GMW_S38E146_2020_v3.tif" ->
+
+    [[-38, -39, -39, -38],
+    [146, 146, 147, 147]].
+    """
+    lat = re.search(r"[NS](\d+)[EW]", tilename)
+    if lat.group(0).startswith('N'):
+        lat = int(lat.group(1))
+    else:
+        lat = -int(lat.group(1))
+    lon = re.search(r"[EW](\d+)_", tilename)
+    if lon.group(0).startswith('E'):
+        lon = int(lon.group(1))
+    else:
+        lon = -int(lon.group(1))
+    return np.array([
+        [lat, lat - 1, lat - 1, lat],
+        [lon, lon, lon + 1, lon + 1]
+    ])
+
+
+def get_tile_names(gmwdir: str, spatial_predicate: Callable[[tuple], bool] = None) -> list[str]:
     """
     Get the names of 1x1 degree tiles which intersect a region of interest.
     :param gmwdir: Path to directory of GMW archive data, e.g. "/location/of/gmw_v3_2020/"
@@ -17,23 +42,13 @@ def tiles_intersecting_region(gmwdir: str, spatial_predicate: Callable[[tuple], 
     """
     result = []
     for tilename in os.listdir(gmwdir):
-        lat = re.search(r"[NS](\d+)[EW]", tilename)
-        if lat.group(0).startswith('N'):
-            lat = int(lat.group(1))
-        else:
-            lat = -int(lat.group(1))
-        lon = re.search(r"[EW](\d+)_", tilename)
-        if lon.group(0).startswith('E'):
-            lon = int(lon.group(1))
-        else:
-            lon = -int(lon.group(1))
-        corners = [[lat, lon], [lat - 1, lon], [lat - 1, lon + 1], [lat, lon + 1]]
+        corners = get_tile_corners(tilename).T
         if spatial_predicate is None or gch_intersects_region(corners, spatial_predicate):
             result.append(tilename)
     return result
 
 
-def mangrove_locations_from_tiles(gmwdir: str, tilenames: list[str]) -> np.ndarray:
+def get_mangrove_locations_from_tiles(gmwdir: str, tilenames: list[str]) -> np.ndarray:
     """
     Create an array containing the lat, lon locations of mangrove pixels in a list of GMW tiles.
     :param gmwdir: Path to GMW data directory, e.g. "/location/of/gmw_v3_2020/"
@@ -55,16 +70,19 @@ def mangrove_locations_from_tiles(gmwdir: str, tilenames: list[str]) -> np.ndarr
     return np.vstack([latitude, longitude]).T
 
 
+# TODO: get it working approximately by returning Polygons, then switch to boxes
+def get_tiles(tilenames: list[str]) -> list[BoundingBox]:
+    """Return a list of Bounding Boxes representing the 1x1 degree tiles containing mangroves."""
+    return [Polygon(get_tile_corners(tn)) for tn in tilenames]
+
+
 # small test for debugging
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    from GEDI.shotconstraint import LatLonBox
+    from Tests.test_arcs import plotarc
 
-    gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
-    # contains everglades national park
-    bounds = LatLonBox(minlat=24.85, maxlat=25.8899, minlon=-81.5183, maxlon=-80.3887)
-    tilenames = tiles_intersecting_region(gmwdir, bounds.spatial_predicate)
-    points = mangrove_locations_from_tiles(gmwdir, tilenames)
-
-    plt.scatter(points[:, 1], points[:, 0])
+    names = get_tile_names(gmwdir="/Users/fcseidl/Downloads/gmw_v3_2020/")
+    print(len(names))
+    for tile in get_tiles(names):
+        plotarc(tile, s=1, c='black')
     plt.show()

@@ -8,8 +8,8 @@ from GMW import gmw
 
 print("Loading GMW points...")
 gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"
-tilenames = gmw.tiles_intersecting_region(gmwdir)
-points = gmw.mangrove_locations_from_tiles(gmwdir, tilenames)
+tilenames = gmw.get_tile_names(gmwdir)
+points = gmw.get_mangrove_locations_from_tiles(gmwdir, tilenames)
 plt.scatter(points[::500, 1], points[::500, 0], s=1, c='black')
 plt.show()
 
