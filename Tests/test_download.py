@@ -5,32 +5,6 @@ import pickle
 from GEDI.download import downloadandfilterurls
 from GEDI.shotconstraint import LatLonBox, Buffer
 from GEDI.granuleconstraint import GranuleConstraint
-from Spherical.arc import Polygon
-from Spherical.neighbors import BallTree, touchset
-from GMW import gmw
-
-from Tests.test_arcs import plotarc
-
-
-def test_xml_polys_gmw():
-    print("Loading tree from GMW points...")
-    with open("/Users/fcseidl/EarthLab-local/BioExtremes/gmw2020tree.pickle", "rb") as reader:
-        tree = pickle.load(reader)
-
-    print("Processing granules...")
-    links = ["https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/" + s for s in [
-        "GEDI02_A_2020146010156_O08211_04_T02527_02_003_01_V002.h5",    # hits some mangroves in Africa
-        "GEDI02_A_2020146023448_O08212_02_T03798_02_003_01_V002.h5",    # Alaska, too far north
-        "GEDI02_A_2020146180335_O08222_02_T03349_02_003_01_V002.h5",    # Just Europe, also too far north
-        "GEDI02_A_2020146180335_O08222_03_T03349_02_003_01_V002.h5"     # Probably hits something in Malaysia
-    ]]
-    for link in links:
-        verts = GranuleConstraint.getboundingpolygon(link)
-        poly = Polygon(np.flip(verts, axis=0).T)
-        d2poly = lambda p: np.radians(poly.distance(np.degrees(p)))
-        touch, _ = touchset(d2poly, tree, atol=np.radians(2))            # one degree tolerance
-        plotarc(poly, s=0.5, c='green' if touch else 'red')
-    plt.show()
 
 
 def test_lonlatbox_across_idl():

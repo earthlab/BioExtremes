@@ -1,11 +1,9 @@
 
 import os
 import re
-from typing import Callable
 import numpy as np
 import rasterio
 
-from geometry import gch_intersects_region      # TODO: don't use this
 from Spherical.arc import Polygon, BoundingBox
 
 
@@ -33,7 +31,7 @@ def get_tile_corners(tilename: str) -> np.ndarray:
     ])
 
 
-def get_tile_names(gmwdir: str, spatial_predicate: Callable[[tuple], bool] = None) -> list[str]:
+def get_tile_names(gmwdir: str) -> list[str]:
     """
     Get the names of 1x1 degree tiles which intersect a region of interest.
     :param gmwdir: Path to directory of GMW archive data, e.g. "/location/of/gmw_v3_2020/"
@@ -42,9 +40,7 @@ def get_tile_names(gmwdir: str, spatial_predicate: Callable[[tuple], bool] = Non
     """
     result = []
     for tilename in os.listdir(gmwdir):
-        corners = get_tile_corners(tilename).T
-        if spatial_predicate is None or gch_intersects_region(corners, spatial_predicate):
-            result.append(tilename)
+        result.append(tilename)
     return result
 
 
