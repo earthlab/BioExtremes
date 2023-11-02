@@ -24,6 +24,55 @@ def plotarc(arc: Arc, **kwargs):
     plt.ylim((-90, 90))
 
 
+def test_poly_intersects_appearance():
+    side = 10
+    latrange = range(90, -90, -side)
+    lonrange = range(-180, 180, side)
+    topleft = [(lat, lon) for lat in latrange for lon in lonrange]
+    topright = [(lat, lon + side) for lat in latrange for lon in lonrange]
+    bottomright = [(lat - side, lon + side) for lat in latrange for lon in lonrange]
+    bottomleft = [(lat - side, lon) for lat in latrange for lon in lonrange]
+    polys = []
+    for tl, bl, br, tr in zip(topleft, bottomleft, bottomright, topright):
+        if tl[0] == 90:
+            polys.append(Polygon(np.array([tl, bl, br]).T))
+        elif bl[0] == -90:
+            polys.append(Polygon(np.array([tl, bl, tr]).T))
+        else:
+            polys.append(Polygon(np.array([tl, bl, br, tr]).T))
+    points = np.array([
+        [45, -22, -22],
+        [0, -80, 80]
+    ])
+    pl = Polygon(points)
+    for p in polys:
+        if p.intersections(pl) is not None:
+            plotarc(p, s=1, color='blue')
+    plotarc(pl, s=1, color='black')
+    plt.show()
+
+
+def test_poly_distance_appearance():
+    points = np.array([
+        [45, -22, -22],
+        [0, -80, 80]
+    ])
+    pl = Polygon(points)
+    res = 90
+    latplot = np.linspace(90, -90, res)
+    lonplot = np.linspace(-180, 180, 2 * res)
+    color = []
+    # check grid of points
+    for lat in latplot:
+        for lon in lonplot:
+            color.append(pl.distance((lat, lon)))
+    # check ref p and antipode
+    color = np.array(color).reshape((res, 2 * res))
+    plt.imshow(color, extent=[-180, 180, -90, 90])
+    plotarc(pl, c='white', s=1)
+    plt.show()
+
+
 def test_bb_poly_intersection():
     poly = Polygon(np.array([
         [35, -10, -50, 0, 35],
