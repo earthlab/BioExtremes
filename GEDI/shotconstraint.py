@@ -8,6 +8,7 @@ from sklearn.neighbors import BallTree
 R_earth = 6378100   # equatorial radius in meters (astropy)
 
 
+# TODO: allow constraints on iterable features, e.g. rh
 class ShotConstraint:
     """
     Base class for a functor which subsets a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
@@ -52,6 +53,7 @@ class SpatialShotConstraint(ShotConstraint):
         raise NotImplementedError('SpatialShotConstraint is an abstract class, only subclasses should be constructed!')
 
 
+# TODO: replace this with a regional constraint based on a SimplePiecewiseArc
 class LatLonBox(SpatialShotConstraint):
     """
     Drop shots with coordinates outside a closed bounding box will be dropped. Note that longitude wraps at 180 = -180.
@@ -71,7 +73,7 @@ class LatLonBox(SpatialShotConstraint):
         df.drop(index=dropidx, inplace=True)
 
     def spatial_predicate(self, lat, lon) -> bool:
-        """Return whether a p is inside the box."""
+        """Return whether a point is inside the box."""
         lont = (lon - self._minlon) % 360
         return (lont <= self._maxlont) & (lat >= self._minlat) & (lat <= self._maxlat)
 

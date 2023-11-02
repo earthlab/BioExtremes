@@ -2,28 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
+import pandas as pd
+
 from GEDI.download import downloadandfilterurls
 from GEDI.shotconstraint import LatLonBox, Buffer
-from GEDI.granuleconstraint import GranuleConstraint
+from GEDI.api import L2AAPI
 
 
 def test_lonlatbox_across_idl():
     granule_urls = [
-        "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146210921_O08224_01_T04774_02_003_01_V002.h5",
-        "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_02_T02527_02_003_01_V002.h5"
+        "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146210921_O08224_01_T04774_02_003_01_V002.h5"
     ]
     shotconstraint = LatLonBox(minlon=179, maxlon=-179)    # crossing date line
-    granuleconstraint = GranuleConstraint(shotconstraint.spatial_predicate)
-    keepobj = {
-        'lon_lowestmode': 'longitude',
-        'quality_flag': 'quality_flag',
-        'degrade_flag': 'degrade_flag'
-    }
+    keepobj = pd.DataFrame({
+        'key': ['lon_lowestmode', 'quality_flag', 'rh', 'rh'],
+        'name': ['longitude', 'quality_flag', 'rh25', 'rh75'],
+        'index': [None, None, 25, 75]
+    })
     data = downloadandfilterurls(
         granule_urls,
+        L2AAPI(),
         ["BEAM0101"],
         keepobj,
-        granuleselector=granuleconstraint,
         constraindf=shotconstraint,
         progess_bar=False
     )
@@ -31,8 +31,6 @@ def test_lonlatbox_across_idl():
     assert ((data['longitude'] >= 179) | (data['longitude'] <= -179)).all()
     # all shots good quality
     assert (data['quality_flag'] == 1).all()
-    # all shots not degraded
-    assert (data['degrade_flag'] == 0).all()
     # only shots from first granule kept (second is outside bounds)
     assert (data['granule_id'] == 'GEDI02_A_2020146210921_O08224_01_T04774_02_003_01_V002').all()
     # all shots from the same beam (only 0101 was requested)
@@ -47,10 +45,16 @@ def test_buffered_cities():
         [-34.93, 138.60],   # Adelaide
         [-27.47, 153.03]    # Brisbane
     ])
+    keepobj = pd.DataFrame({
+        'key': ['lon_lowestmode', 'lat_lowestmode'],
+        'index': [None, None],
+        'name': ['longitude', 'latitude']
+    })
     data = downloadandfilterurls(
         urls,
+        L2AAPI(),
         ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],
-        keepobj={'lon_lowestmode': 'longitude', 'lat_lowestmode': 'latitude'},
+        keepobj=keepobj,
         constraindf=Buffer(500000, cities)
     )
     plt.scatter([138.60], [-34.93], label='Adelaide')

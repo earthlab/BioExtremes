@@ -86,9 +86,9 @@ class GEDIAPI:
                     else:
                         break
                 return func(memfile, *args, **kwargs)
-            except MemoryError:
-                # TODO: what causes these?
-                print(f"Memory error caused failed download from {link}")
+            except Exception:
+                # TODO: figure out the problems. Most are to do with the memory files
+                print(f"An Exception caused failed download from {link}")
                 return
 
     @staticmethod

@@ -269,8 +269,7 @@ class SimplePiecewiseArc(Arc):
             arcs: list[Arc],
             atol: float = numerics.default_tol,
             checksimple: bool = True,
-            checkcontinuous: bool = True
-            ):
+            checkcontinuous: bool = True):
         """
         Initiate a SimplePiecewiseArc from a list of Arcs.
 
