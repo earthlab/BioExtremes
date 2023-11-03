@@ -12,8 +12,8 @@ from GEDI.granuleconstraint import RegionGC, CompositeGC
 """
 Specify the location of the Global Mangrove Watch data, and the number of parallel process.
 """
-# gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
-gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
+gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
+# gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
 
 
 """

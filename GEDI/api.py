@@ -87,7 +87,7 @@ class GEDIAPI:
                         break
                 return func(memfile, *args, **kwargs)
             except Exception as e:
-                # TODO: figure out the problems. Most are to do with the memory files
+                # TODO: figure out the problems with the memory files
                 print(f"An Exception of type {type(e)} caused failed download from {link}")
                 return
 
