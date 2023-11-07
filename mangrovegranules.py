@@ -2,11 +2,18 @@
 
 import os
 from datetime import date
-from multiprocessing import freeze_support, Pool
+from concurrent import futures
+import warnings     # TODO: shouldn't have to do this
 
 from GMW import gmw
 from GEDI.api import L2AAPI
 from GEDI.granuleconstraint import RegionGC, CompositeGC
+
+
+"""
+Clumsily suppress warnings caused by arcsin calculations
+"""
+warnings.filterwarnings("ignore")
 
 
 """
@@ -16,12 +23,7 @@ gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
 # gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
 
 
-"""
-This conditional block with freeze_support() prevents certain warnings.
-"""
 if __name__ == "__main__":
-    freeze_support()
-
     """
     Use the GMW.gmw module to obtain bounding boxes for each 1x1 degree cell of the global grid containing mangroves.
     """
@@ -54,8 +56,8 @@ if __name__ == "__main__":
     range contains 74121 granules.
     """
     urls = api.urls_in_date_range(
-        t_start=date(2019, 1, 1),
-        t_end=date(2023, 9, 30),
+        t_start=date(2019, 4, 18),      # first day of GEDI archive
+        t_end=date(2019, 10, 31),
         suffix='.xml'
     )
 
@@ -66,10 +68,10 @@ if __name__ == "__main__":
     information permanently, so that it can be used to selectively download granules for shot-level subsetting.
     """
     print(f"Parallelizing over {nproc} processes...")
-    with Pool(nproc) as pool:
+    with futures.ThreadPoolExecutor(nproc) as executor:
         n = 1
         print("index, accepted, url")
-        for accept, url in pool.imap_unordered(constraint, urls):
+        for accept, url in executor.map(constraint, urls):  # unfortunately, urls are unpacked immediately
             print(f"{n}, {accept}, {url}")
             n += 1
 
