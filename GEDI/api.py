@@ -38,8 +38,13 @@ class GEDIAPI:
 
     def check_credentials(self):
         """Will raise a permissions error if unable to download."""
-        self.request_raw_data(
-            "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml")
+        try:
+            self.request_raw_data(
+                "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml")
+        except HTTPError as e:
+            print('An HTTPError occurred, suggesting that your authentication may have failed. \
+                    Are your credentials correct?')
+            raise e
 
     def request_raw_data(self, link: str):
         """
@@ -58,12 +63,7 @@ class GEDIAPI:
         )
         urllib.request.install_opener(opener)
         myrequest = urllib.request.Request(link)
-        try:
-            return urllib.request.urlopen(myrequest)
-        except HTTPError as e:
-            print('An HTTPError occurred, suggesting that your authentication may have failed. \
-                    Are your credentials correct?')
-            raise e
+        return urllib.request.urlopen(myrequest)
 
     def process_in_memory_file(self, link: str, func: Callable, *args, **kwargs):
         """
@@ -87,7 +87,6 @@ class GEDIAPI:
                         break
                 return func(memfile, *args, **kwargs)
             except Exception as e:
-                # TODO: figure out the problems with the memory files
                 print(f"An Exception of type {type(e)} caused failed download from {link}")
                 return
 
