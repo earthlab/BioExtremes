@@ -39,8 +39,10 @@ class GEDIAPI:
     def check_credentials(self):
         """Will raise a permissions error if unable to download."""
         try:
-            self.request_raw_data(
-                "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml")
+            self.process_in_memory_file(
+                "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml",
+                lambda _: True
+            )
         except HTTPError as e:
             print('An HTTPError occurred, suggesting that your authentication may have failed. \
                     Are your credentials correct?')
