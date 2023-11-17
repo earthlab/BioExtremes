@@ -55,11 +55,11 @@ if __name__ == "__main__":
     extension. We choose the .xml extension, as these files contain the bounding polygons of each granule. This date 
     range contains 74121 granules.
     """
-    urls = api.urls_in_date_range(
+    urls = list(api.urls_in_date_range(
         t_start=date(2019, 4, 18),      # first day of GEDI archive
         t_end=date(2019, 10, 31),
         suffix='.xml'
-    )
+    ))
 
     """
     This block performs the brunt of the computation, which is why parallelism is employed here. As the loop runs, it 
