@@ -54,10 +54,11 @@ if __name__ == "__main__":
     This GEDI.api method gives an iterator over every (in this case, L2A) file in the GEDI archive with a certain 
     extension. We choose the .xml extension, as these files contain the bounding polygons of each granule. This date 
     range contains 74121 granules.
+    EDIT: actually, we only get 2020 granules
     """
     urls = list(api.urls_in_date_range(
-        t_start=date(2019, 4, 18),      # first day of GEDI archive
-        t_end=date(2019, 10, 31),
+        t_start=date(2020, 1, 1),
+        t_end=date(2020, 12, 31),
         suffix='.xml'
     ))
 
