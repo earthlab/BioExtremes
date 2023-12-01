@@ -8,6 +8,7 @@ import os
 from io import BytesIO
 from urllib.error import HTTPError
 
+import certifi
 import requests
 from typing import List, Tuple, Callable, Iterator
 from http.cookiejar import CookieJar
@@ -35,6 +36,13 @@ class GEDIAPI:
         self._file_re = None
         self._tif_re = None
         self._dates = None
+
+        # resolve potential issue with SSL certs
+        ssl_cert_path = certifi.where()
+        if 'SSL_CERT_FILE' not in os.environ or os.environ['SSL_CERT_FILE'] != ssl_cert_path:
+            os.environ['SSL_CERT_FILE'] = ssl_cert_path
+        if 'REQUESTS_CA_BUNDLE' not in os.environ or os.environ['REQUESTS_CA_BUNDLE'] != ssl_cert_path:
+            os.environ['REQUESTS_CA_BUNDLE'] = ssl_cert_path
 
     def check_credentials(self):
         """Will raise a permissions error if unable to download."""

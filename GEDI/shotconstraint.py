@@ -8,7 +8,6 @@ from sklearn.neighbors import BallTree
 R_earth = 6378100   # equatorial radius in meters (astropy)
 
 
-# TODO: allow constraints on iterable features, e.g. rh
 class ShotConstraint:
     """
     Base class for a functor which subsets a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
@@ -34,7 +33,7 @@ class ShotConstraint:
         return []
 
     def _extra_constraints(self, df: pd.DataFrame) -> None:
-        """May be overridden to drop additional shots in place."""
+        """Drop additional shots from df in-place based on other requirements."""
         pass
 
     def spatial_predicate(self, lon, lat) -> bool:
@@ -79,7 +78,7 @@ class LatLonBox(SpatialShotConstraint):
 
 
 class Buffer(SpatialShotConstraint):
-    """Drop shots with coordinates farther that a fixed radius from a discrete set of points."""
+    """Drop shots with coordinates farther that a fixed radius from a finite set of points."""
 
     def __init__(self, radius: float, points: np.ndarray):
         """

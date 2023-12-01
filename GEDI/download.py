@@ -7,7 +7,7 @@ from typing import Callable
 import h5py
 import pandas as pd
 import os
-from multiprocessing import Pool
+from concurrent import futures
 from tqdm import tqdm
 
 from GEDI.api import GEDIAPI
@@ -136,8 +136,8 @@ def downloadandfilterurls(
     frames = []
     killed = False
     try:
-        with Pool(nproc) as pool:
-            sequence = pool.imap_unordered(_processgranule, argslist)
+        with futures.ThreadPoolExecutor(nproc) as executor:
+            sequence = executor.map(_processgranule, argslist)
             if progess_bar:
                 sequence = tqdm(sequence, total=len(argslist))
             for df in sequence:
