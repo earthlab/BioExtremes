@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 Specify the location of the Global Mangrove Watch data, and the number of parallel process.
 """
 gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
-# gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
+#gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
 
 
 if __name__ == "__main__":

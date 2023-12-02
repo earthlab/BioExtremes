@@ -55,7 +55,8 @@ def test_buffered_cities():
         L2AAPI(),
         ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],
         keepobj=keepobj,
-        constraindf=Buffer(500000, cities)
+        constraindf=Buffer(500000, cities),
+        nproc=2
     )
     plt.scatter([138.60], [-34.93], label='Adelaide')
     plt.scatter([153.03], [-27.47], label='Brisbane')
