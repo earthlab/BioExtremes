@@ -66,7 +66,7 @@ def get_mangrove_locations_from_tiles(gmwdir: str, tilenames: list[str]) -> np.n
     return np.vstack([latitude, longitude]).T
 
 
-# TODO: get it working approximately by returning Polygons, then switch to boxes
+# TODO: actually return BoundingBox rather than Polygon
 def get_tiles(tilenames: list[str]) -> list[BoundingBox]:
     """Return a list of Bounding Boxes representing the 1x1 degree tiles containing mangroves."""
     return [Polygon(get_tile_corners(tn)) for tn in tilenames]
