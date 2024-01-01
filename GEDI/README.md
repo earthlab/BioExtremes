@@ -1,4 +1,4 @@
-This folder contains a variety of tools for accessing, subsetting, and downloading GEDI L2A, L2B, and L1B data products. Each module is documented below, followed by a few examples. Note that the docstrings for public classes and functions provide further information on their behavior and implementation. Also note that before running the example codes, one must configure the environment variables as described in the ```api``` section.
+This folder contains a variety of tools for accessing, subsetting, and downloading GEDI L2A, L2B, and L1B data products. Each module is documented below, as well as an example script. Note that the docstrings for public classes and functions provide further information on their behavior and implementation.
 
 # Modules
 
@@ -23,7 +23,4 @@ While granule constraints can determine which ```.h5``` files contain data of in
 This module contains a single public method, ```downloadandfilterurls```, which applies a ```shotconstraint.ShotConstraint``` to capture the relevant data from a list of granules in a DataFrame or a ```.csv``` file. It allows multithreading to accelerate downloads manyfold on HPC clusters.
 
 # Code Examples
-
-## Granule-level subsetting
-
-## Shot-level subsetting
+Downloading GEDI data is time-consuming, so a notebook is not a practical format for a tutorial. Instead, see the example scripts in the top directory, ```mangrovegranules.py``` and ```mangroveshots.py```. These two scripts perform successive jobs to find the granules, then the shots, containing high-quality data from the locations of mangrove forest according to the 2020 [Global Mangrove Watch](https://data.unep-wcmc.org/datasets/45) record. Note that the granule-level filtering is performed by a ```granuleconstraint.CompositeGC``` object representing the union of all tiles in the GMW dataset. The shot-level filtering uses a ```shotconstraint.Buffer``` around the individual points in the dataset.
