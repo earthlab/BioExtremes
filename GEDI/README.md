@@ -23,4 +23,18 @@ While granule constraints can determine which ```.h5``` files contain data of in
 This module contains a single public method, ```downloadandfilterurls```, which applies a ```shotconstraint.ShotConstraint``` to capture the relevant data from a list of granules in a DataFrame or a ```.csv``` file. It allows multithreading to accelerate downloads manyfold on HPC clusters.
 
 # Code Examples
-Downloading GEDI data is time-consuming, so a notebook is not a practical format for a tutorial. Instead, see the example scripts in the top directory, ```mangrovegranules.py``` and ```mangroveshots.py```. These two scripts perform successive jobs to find the granules, then the shots, containing high-quality data from the locations of mangrove forest according to the 2020 [Global Mangrove Watch](https://data.unep-wcmc.org/datasets/45) record. Note that the granule-level filtering is performed by a ```granuleconstraint.CompositeGC``` object representing the union of all tiles in the GMW dataset. The shot-level filtering uses a ```shotconstraint.Buffer``` around the individual points in the dataset. The granule-level script's output should be piped to the filename read by the shot-level script.
+Downloading GEDI data is time-consuming, so a notebook is not a practical format for a tutorial. Instead, see the example scripts in the top directory, ```mangrovegranules.py``` and ```mangroveshots.py```. These two scripts perform successive jobs to find the granules, then the shots, containing high-quality data from the locations of mangrove forest according to the 2020 [Global Mangrove Watch](https://data.unep-wcmc.org/datasets/45) record. Note that the granule-level filtering is performed by a ```granuleconstraint.CompositeGC``` object representing the union of all tiles in the GMW dataset. The granules script outputs the following:
+```
+Loading bounding boxes of GMW tiles...
+Checking authentication with https://urs.earthdata.nasa.gov...
+Parallelizing over 3 processes...
+index, accepted, url
+1, False, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008012804_O06072_01_T02722_02_003_01_V002.h5.xml
+2, True, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008012804_O06072_02_T02722_02_003_01_V002.h5.xml
+3, True, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008012804_O06072_03_T02722_02_003_01_V002.h5.xml
+4, True, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008012804_O06072_04_T02722_02_003_01_V002.h5.xml
+5, False, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008030056_O06073_01_T03993_02_003_01_V002.h5.xml
+6, True, https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.01.08/GEDI02_A_2020008030056_O06073_02_T03993_02_003_01_V002.h5.xml
+...
+```
+The boolean value next to each metadata url indicates whether the granule's bounding polygon intersects any of the GMW mangrove tiles. When run on a file containing the above output, the shot-level script will download and filter exactly these granules, using a ```shotconstraint.Buffer``` around the individual points in the dataset.
