@@ -59,7 +59,7 @@ def _subsetgranule(
 ) -> pd.DataFrame:
     """
     First parameter is a file-like object with data to filter. Subsequent parameters are the beamnames, keepobj,
-    keepevery, and constraindf arguments as used by downloadandfilterl2aurls(). Return a dataframe with the filtered
+    keepevery, and shotconstraint arguments as used by downloadandfilterl2aurls(). Return a dataframe with the filtered
     data, or nothing if no data is extracted.
     """
     frames = []
@@ -76,7 +76,7 @@ def _processgranule(args: tuple) -> pd.DataFrame:
     multiprocessing.Pool.imap_unordered. Granule id is added to dataframe.
 
     :param args: Contains, in order, the remote url to the data, an appropriate GEDIAPI object to access that link,
-                    then the beamnames, keepobj, keepevery, and constraindf arguments as used by
+                    then the beamnames, keepobj, keepevery, and shotconstraint arguments as used by
                     downloadandfilterl2aurls().
     :return: Filtered data from all beams. Return nothing if no data is extracted.
     """
@@ -101,7 +101,7 @@ def downloadandfilterurls(
     beamnames: list[str],
     keepobj: pd.DataFrame,
     keepevery: int = 50,
-    constraindf: ShotConstraint = ShotConstraint(),
+    shotconstraint: ShotConstraint = ShotConstraint(),
     nproc: int = 1,
     csvdest: str = None,
     progess_bar: bool = True
@@ -121,7 +121,7 @@ def downloadandfilterurls(
                         resulting dataframe will have the latitude of each shot stored in a column called 'lat', and
                         the 50th percentile rh metric stored in a column called 'rh50'.
     :param keepevery: create a representative sample using only one in every keep_every shots.
-    :param constraindf: A ShotConstraint object to be applied to the resulting DataFrame.
+    :param shotconstraint: A ShotConstraint object to be applied to the resulting DataFrame.
     :param nproc: Number of parallel processes.
     :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every granule
@@ -130,7 +130,7 @@ def downloadandfilterurls(
     if csvdest and os.path.exists(csvdest):
         raise ValueError(f'Can not overwrite prexisting file at {csvdest}')
     urls = sorted(urls)
-    argslist = [(link, api, beamnames, keepobj, keepevery, constraindf) for link in urls]
+    argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint) for link in urls]
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
     frames = []

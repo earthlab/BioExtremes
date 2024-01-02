@@ -19,8 +19,8 @@ warnings.filterwarnings("ignore")
 """
 Specify the location of the Global Mangrove Watch data, and the number of parallel process.
 """
-gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
-#gmwdir = "/Users/fcseidl/Downloads/gmw_v3_2020/"; nproc = 3
+#gmwdir = "/pl/active/earthlab/bioextremes/gmw_v3_2020/"; nproc = os.cpu_count()
+gmwdir = "/Users/fcseidl/EarthLab-local/BioExtremes/gmw_v3_2020/"; nproc = 3
 
 
 if __name__ == "__main__":
@@ -52,27 +52,26 @@ if __name__ == "__main__":
 
     """
     This GEDI.api method gives an iterator over every (in this case, L2A) file in the GEDI archive with a certain 
-    extension. We choose the .xml extension, as these files contain the bounding polygons of each granule. This date 
-    range contains 74121 granules.
-    EDIT: actually, we only get 2020 granules
+    extension from 2020. 
     """
-    urls = list(api.urls_in_date_range(
+    urls = api.urls_in_date_range(
         t_start=date(2020, 1, 1),
         t_end=date(2020, 12, 31),
         suffix='.xml'
-    ))
+    )
 
     """
     This block performs the brunt of the computation, which is why parallelism is employed here. As the loop runs, it 
     will print every granule with an associated index, a boolean value indicating if the granule passes the constraint 
     specified above, and the link to the granule's associated xml metadata file. Output can be redirected to store this 
-    information permanently, so that it can be used to selectively download granules for shot-level subsetting.
+    information permanently, so that it can be used to selectively download granules for shot-level subsetting. 
+    Note that the loop will take a while to get going because ThreadPoolExecutor.map() unpacks the iterable up front.
     """
     print(f"Parallelizing over {nproc} processes...")
     with futures.ThreadPoolExecutor(nproc) as executor:
         n = 1
         print("index, accepted, url")
-        for accept, url in executor.map(constraint, urls):  # unfortunately, urls are unpacked immediately
+        for accept, url in executor.map(constraint, urls):
             print(f"{n}, {accept}, {url}")
             n += 1
 

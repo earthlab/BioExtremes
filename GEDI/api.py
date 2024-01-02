@@ -56,7 +56,7 @@ class GEDIAPI:
                     Are your credentials correct?')
             raise e
 
-    def request_raw_data(self, link: str):
+    def _request_raw_data(self, link: str):
         """
         Request data from the NASA earthdata servers. Authentication is established using the username and password
         found in the local ~/.netrc file.
@@ -85,7 +85,7 @@ class GEDIAPI:
         :param kwargs: Passed to func.
         :return: Result of func([linked file], *args, **kwargs), or None if a memory error occurs.
         """
-        response = self.request_raw_data(link)
+        response = self._request_raw_data(link)
         response.begin()
         with BytesIO() as memfile:
             try:
