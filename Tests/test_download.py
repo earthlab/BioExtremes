@@ -24,7 +24,7 @@ def test_lonlatbox_across_idl():
         L2AAPI(),
         ["BEAM0101"],
         keepobj,
-        constraindf=shotconstraint,
+        shotconstraint=shotconstraint,
         progess_bar=False
     )
     # all shots in bounding box
@@ -55,7 +55,7 @@ def test_buffered_cities():
         L2AAPI(),
         ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],
         keepobj=keepobj,
-        constraindf=Buffer(500000, cities),
+        shotconstraint=Buffer(500000, cities),
         nproc=2
     )
     plt.scatter([138.60], [-34.93], label='Adelaide')
