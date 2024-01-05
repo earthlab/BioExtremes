@@ -60,3 +60,7 @@ def anglelatlon(p0: tuple | np.ndarray, p1: tuple | np.ndarray) -> float | np.nd
     h2 = sind((lat1 - lat0) / 2.) ** 2 + cosd(lat1) * cosd(lat0) * sind((lon1 - lon0) / 2.) ** 2
     return 2 * arcsind(np.sqrt(h2))
 
+
+def addtolon(lon, delta):
+    """Add a delta to a longitude, wrapping appropriately around [-180, 180)."""
+    return (lon + delta + 180) % 360 - 180
