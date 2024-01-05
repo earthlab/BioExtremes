@@ -1,6 +1,6 @@
 """
-This script performs a comparison between maximum wind speeds from different storms as reported in IBTrACS and ERA5
-datasets.
+This script performs a comparison between maximum wind speeds from different storms as
+reported in IBTrACS and ERA5 datasets.
 """
 
 import cdsapi
@@ -15,8 +15,11 @@ from tqdm import tqdm
 from Spherical.functions import addtolon
 
 
-mps2kts = 1.94384
+mps2kts = 1.94384   # unit conversion ratio
+
+# where to save the data from each storm
 savepath = "/Users/fcseidl/EarthLab-local/BioExtremes/WindComparisonBasins.csv"
+
 np.random.seed(0)
 
 # IBTrACS data where max wind and basin are recorded
