@@ -92,6 +92,7 @@ def _processgranule(args: tuple) -> pd.DataFrame:
     iend = link.rindex('.')
     granule_id = link[istart:iend]
     df['granule_id'] = [granule_id for _ in range(df.shape[0])]
+    print(f'Writing {link}')
     df.tocsv(os.path.join(outdir, os.path.basename(link)))
 
 
@@ -133,6 +134,11 @@ def downloadandfilterurls(
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
     with futures.ThreadPoolExecutor(nproc) as executor:
-        sequence = executor.map(_processgranule, argslist)
         if progess_bar:
-            sequence = tqdm(sequence, total=len(argslist))
+            progress_bar = tqdm(total=len(argslist))
+        for arg in argslist:
+            executor.submit(_processgranule, arg)
+            if progess_bar:
+                progress_bar.update(1)  # Update progress bar immediately upon submission
+        if progess_bar:
+            progress_bar.close()
