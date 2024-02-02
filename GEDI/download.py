@@ -15,11 +15,11 @@ from GEDI.shotconstraint import ShotConstraint
 
 
 def _subsetbeam(
-    granule,
-    beam: str,
-    keepobj: pd.DataFrame,
-    keepevery: int,
-    constraindf: ShotConstraint,
+        granule,
+        beam: str,
+        keepobj: pd.DataFrame,
+        keepevery: int,
+        constraindf: ShotConstraint,
 ) -> pd.DataFrame:
     """
     Subset the data from a single beam from a granule, so that only shots meeting a constraint are kept.
@@ -36,7 +36,7 @@ def _subsetbeam(
             try:
                 idx = int(idx)
                 df[name] = granule[obj][()][::keepevery, int(idx)]
-            except (ValueError, TypeError):         # idx cannot be cast to int
+            except (ValueError, TypeError):  # idx cannot be cast to int
                 df[name] = granule[obj][()][::keepevery]
         except KeyError:
             # TODO: what is happening? At least print the name of the file
@@ -80,7 +80,7 @@ def _processgranule(args: tuple) -> pd.DataFrame:
                     downloadandfilterl2aurls().
     :return: Filtered data from all beams. Return nothing if no data is extracted.
     """
-    link, api, beamnames, keepobj, keepevery, constraindf = args
+    link, api, beamnames, keepobj, keepevery, constraindf, outdir = args
     # download and filter large h5 file
     df = api.process_in_memory_file(
         link,
@@ -92,19 +92,19 @@ def _processgranule(args: tuple) -> pd.DataFrame:
     iend = link.rindex('.')
     granule_id = link[istart:iend]
     df['granule_id'] = [granule_id for _ in range(df.shape[0])]
-    return df
+    df.tocsv(os.path.join(outdir, os.path.basename(link)))
 
 
 def downloadandfilterurls(
-    urls: list[str],
-    api: GEDIAPI,
-    beamnames: list[str],
-    keepobj: pd.DataFrame,
-    keepevery: int = 50,
-    shotconstraint: ShotConstraint = ShotConstraint(),
-    nproc: int = 1,
-    csvdest: str = None,
-    progess_bar: bool = True
+        urls: list[str],
+        api: GEDIAPI,
+        beamnames: list[str],
+        keepobj: pd.DataFrame,
+        keepevery: int = 50,
+        shotconstraint: ShotConstraint = ShotConstraint(),
+        nproc: int = 1,
+        outdir: str = None,
+        progess_bar: bool = True
 ) -> pd.DataFrame:
     """
     Filter data from a collection of GEDI granules in parallel, combining all shots meeting a constraint into
@@ -127,32 +127,12 @@ def downloadandfilterurls(
     :return: A dataframe with the filtered data from every granule
     :param progess_bar: If set to False, the progress bar is not printed. True by default.
     """
-    if csvdest and os.path.exists(csvdest):
-        raise ValueError(f'Can not overwrite prexisting file at {csvdest}')
     urls = sorted(urls)
-    argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint) for link in urls]
+    argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint, outdir) for link in urls if not
+    os.path.exists(os.path.join(outdir, os.path.basename(link)))]
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
-    frames = []
-    killed = False
-    try:
-        with futures.ThreadPoolExecutor(nproc) as executor:
-            sequence = executor.map(_processgranule, argslist)
-            if progess_bar:
-                sequence = tqdm(sequence, total=len(argslist))
-            for df in sequence:
-                if df is not None:
-                    frames.append(df)
-    except (KeyboardInterrupt, SystemExit):
-        print(f'Filtering halted by user around {argslist[len(frames)][0]}')
-        killed = True
-    finally:
-        if frames:
-            df = pd.concat(frames, ignore_index=True)
-            if csvdest:
-                print(f'Saving filtered data to {csvdest}')
-                df.to_csv(csvdest, mode='x')
-        if killed:
-            exit(130)
-    return df
-
+    with futures.ThreadPoolExecutor(nproc) as executor:
+        sequence = executor.map(_processgranule, argslist)
+        if progess_bar:
+            sequence = tqdm(sequence, total=len(argslist))
