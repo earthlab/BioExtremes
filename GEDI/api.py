@@ -17,6 +17,7 @@ import re
 from datetime import datetime, timedelta, date
 import urllib
 from bs4 import BeautifulSoup
+import time
 
 
 class GEDIAPI:
@@ -87,6 +88,7 @@ class GEDIAPI:
         """
         response = self._request_raw_data(link)
         response.begin()
+        t1 = time.time()
         with BytesIO() as memfile:
             try:
                 while True:
@@ -95,6 +97,7 @@ class GEDIAPI:
                         memfile.write(chunk)
                     else:
                         break
+                print(time.time() - t1, 'Time to put in memory')
                 return func(memfile, *args, **kwargs)
             except Exception as e:
                 print(f"An Exception of type {type(e)} caused failed download from {link}")

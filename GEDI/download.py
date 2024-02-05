@@ -9,6 +9,7 @@ import pandas as pd
 import os
 from concurrent import futures
 from tqdm import tqdm
+import time
 
 from GEDI.api import GEDIAPI
 from GEDI.shotconstraint import ShotConstraint
@@ -25,6 +26,7 @@ def _subsetbeam(
     Subset the data from a single beam from a granule, so that only shots meeting a constraint are kept.
     Beam name is added to the dataframe.
     """
+    t1 = time.time()
     granule = h5py.File(granule, 'r')
     df = {}
     keys = list(keepobj['key']) + constraindf.getkeys()
@@ -47,6 +49,7 @@ def _subsetbeam(
     df.drop(columns=[col for col in names if not (col == keepobj['name']).any()], inplace=True)
     # add beam name to df
     df['beam'] = [beam for _ in range(df.shape[0])]
+    print(time.time() - t1, 'subsetbeam')
     return df
 
 
@@ -62,12 +65,15 @@ def _subsetgranule(
     keepevery, and shotconstraint arguments as used by downloadandfilterl2aurls(). Return a dataframe with the filtered
     data, or nothing if no data is extracted.
     """
+    t1 = time.time()
     frames = []
     for beamname in beamnames:
         df = _subsetbeam(granule, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
         if df is not None:
             frames.append(df)
-    return pd.concat(frames, ignore_index=True)
+    out_frame = pd.concat(frames, ignore_index=True)
+    print(time.time() - t1, 'subsetgranule')
+    return out_frame
 
 
 def _processgranule(args: tuple) -> pd.DataFrame:
@@ -82,18 +88,20 @@ def _processgranule(args: tuple) -> pd.DataFrame:
     """
     link, api, beamnames, keepobj, keepevery, constraindf, outdir = args
     # download and filter large h5 file
+    t1 = time.time()
     df = api.process_in_memory_file(
         link,
         _subsetgranule,
         beamnames, keepobj, keepevery, constraindf
     )
+    print(time.time() - t1, 'in memory')
     # add granule id to df
     istart = link.rindex('/') + 1
     iend = link.rindex('.')
     granule_id = link[istart:iend]
     df['granule_id'] = [granule_id for _ in range(df.shape[0])]
     print(f'Writing {link}')
-    df.tocsv(os.path.join(outdir, os.path.basename(link)))
+    df.to_csv(os.path.join(outdir, os.path.basename(link)))
 
 
 def downloadandfilterurls(
@@ -131,6 +139,7 @@ def downloadandfilterurls(
     urls = sorted(urls)
     argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint, outdir) for link in urls if not
     os.path.exists(os.path.join(outdir, os.path.basename(link)))]
+    print(len(argslist))
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
     with futures.ThreadPoolExecutor(nproc) as executor:
