@@ -90,18 +90,18 @@ class GEDIAPI:
         response.begin()
         t1 = time.time()
         with BytesIO() as memfile:
-            try:
-                while True:
-                    chunk = response.read()
-                    if chunk:
-                        memfile.write(chunk)
-                    else:
-                        break
-                print(time.time() - t1, 'Time to put in memory')
-                return func(memfile, *args, **kwargs)
-            except Exception as e:
-                print(f"An Exception of type {type(e)} caused failed download from {link}")
-                return
+            # try:
+            while True:
+                chunk = response.read()
+                if chunk:
+                    memfile.write(chunk)
+                else:
+                    break
+            print(time.time() - t1, 'Time to put in memory')
+            return func(memfile, *args, **kwargs)
+            # except Exception as e:
+            #     print(f"An Exception of type {type(e)} caused failed download from {link}")
+            #     return
 
     @staticmethod
     def retrieve_links(url: str, suffix: str = "") -> List[str]:
