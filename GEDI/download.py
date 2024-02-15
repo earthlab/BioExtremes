@@ -139,15 +139,17 @@ def downloadandfilterurls(
     urls = sorted(urls)
     argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint, outdir) for link in urls if not
     os.path.exists(os.path.join(outdir, os.path.basename(link)))]
-    print(len(argslist))
-    if progess_bar:
-        print(f"Filtering {nproc} files at a time; progress so far:")
-    with futures.ThreadPoolExecutor(nproc) as executor:
-        if progess_bar:
-            progress_bar = tqdm(total=len(argslist))
-        for arg in argslist:
-            executor.submit(_processgranule, arg)
-            if progess_bar:
-                progress_bar.update(1)  # Update progress bar immediately upon submission
-        if progess_bar:
-            progress_bar.close()
+    for arg in argslist:
+        _processgranule(arg)
+    # print(len(argslist))
+    # if progess_bar:
+    #     print(f"Filtering {nproc} files at a time; progress so far:")
+    # with futures.ThreadPoolExecutor(nproc) as executor:
+    #     if progess_bar:
+    #         progress_bar = tqdm(total=len(argslist))
+    #     for arg in argslist:
+    #         executor.submit(_processgranule, arg)
+    #         if progess_bar:
+    #             progress_bar.update(1)  # Update progress bar immediately upon submission
+    #     if progess_bar:
+    #         progress_bar.close()
