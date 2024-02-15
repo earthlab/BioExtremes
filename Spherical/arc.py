@@ -2,6 +2,7 @@
 
 from abc import abstractmethod, ABC
 import numpy as np
+from typing import Union
 
 from Spherical import numerics
 from Spherical import functions as fn
@@ -27,7 +28,7 @@ class Arc(ABC):
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
         """xyz(t) without checking t"""
 
-    def xyz(self, t: float | np.ndarray) -> np.ndarray:
+    def xyz(self, t: Union[float, np.ndarray]) -> np.ndarray:
         """
         Unit-speed parameterization of the Arc's Cartesian coordinates in degrees.
 
@@ -41,7 +42,7 @@ class Arc(ABC):
             result = result.reshape(-1)
         return result
 
-    def __call__(self, t: float | np.ndarray) -> np.ndarray:
+    def __call__(self, t: [float, np.ndarray]) -> np.ndarray:
         """
         Unit-speed parameterization of the Arc's spherical coordinates in degrees.
 
@@ -80,7 +81,7 @@ class Arc(ABC):
         except fn.SphericalGeometryException:
             return other._intersections(self, atol)
 
-    def nearest(self, point: tuple | np.ndarray, atol: float = numerics.default_tol) -> tuple:
+    def nearest(self, point: Union[tuple, np.ndarray], atol: float = numerics.default_tol) -> tuple:
         """
         Greedy nearest-point calculation, using golden section search, which works for a Geodesic or part of a
         Parallel, but may need to be overridden for sophisticated Arcs.

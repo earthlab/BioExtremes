@@ -2,7 +2,7 @@
 Implements basic rootfinding and convex optimization schemes for spherical geometry.
 """
 
-from typing import Callable
+from typing import Callable, Union
 import numpy as np
 
 default_tol = np.sqrt(np.finfo(float).eps)      # half of max precision
@@ -16,7 +16,7 @@ def bisection(
         atol: float = default_tol,
         fa=None,
         fb=None
-) -> float | None:
+) -> Union[float, None]:
     """
     Use the bisection method to estimate a root of f on the interval [a, b]. The root must exist and be unique.
 
