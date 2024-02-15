@@ -103,7 +103,7 @@ class Arc(ABC):
 class Geodesic(Arc):
     """An Arc representing the shortest path between two points."""
 
-    def __init__(self, source: tuple | np.ndarray, dest: tuple | np.ndarray, warn=True):
+    def __init__(self, source: Union[tuple, np.ndarray], dest: Union[tuple, np.ndarray], warn=True):
         """
         Construct a Geodesic shortest path.
 
@@ -133,7 +133,7 @@ class Geodesic(Arc):
     def _uncheckedxyz(self, t: np.ndarray) -> np.ndarray:
         return np.outer(self._xyz0, fn.cosd(t)) + np.outer(self._orthonormal, fn.sind(t))
 
-    def _intersectsgc(self, gc, atol: float) -> np.ndarray | None:
+    def _intersectsgc(self, gc, atol: float) -> Union[np.ndarray, None]:
         """
         Return where this geodesic intersects the great circle containing another geodesic gc.
 
@@ -190,7 +190,7 @@ class Parallel(Arc):
         return self._len
 
     # override inherited call method because here it is more natural to work in spherical coordinates
-    def __call__(self, t: float | np.ndarray) -> np.ndarray:
+    def __call__(self, t: Union[float, np.ndarray]) -> np.ndarray:
         """
         Unit-speed parameterization of the Parallel's spherical coordinates in (equatorial) degrees. This means that
         longitude changes at a speed of cosine(latitude).
@@ -329,7 +329,7 @@ class SimplePiecewiseArc(Arc):
         """Return whether the curve is closed."""
         return self._closed
 
-    def contains(self, point: tuple | np.ndarray, method: str = 'refpt') -> bool:
+    def contains(self, point: Union[tuple, np.ndarray], method: str = 'refpt') -> bool:
         """
         Return whether a (lat, lon) point is inside the curve. Assumes counterclockwise orientation. If method='refpt',
         the default, then containment is determined by counting the intersections between the Arc and a Geodesic
@@ -354,7 +354,7 @@ class SimplePiecewiseArc(Arc):
         nints = 0 if ints is None else ints.shape[1]
         return bool((nints + self._refinside) % 2)
 
-    def distance(self, p: tuple | np.ndarray) -> float:
+    def distance(self, p: Union[tuple, np.ndarray]) -> float:
         """
         Return the distance from a point to the region enclosed by the curve, accurate within absolute tolerance.
         Unlike nearest(), this method returns a distance of 0 for any point inside the curve. Whether the point is
@@ -403,7 +403,7 @@ class SimplePiecewiseArc(Arc):
             return ints
 
     # TODO: override decorator?
-    def nearest(self, point: tuple | np.ndarray, atol: float = numerics.default_tol) -> tuple:
+    def nearest(self, point: Union[tuple, np.ndarray], atol: float = numerics.default_tol) -> tuple:
         """
         Nearest-point calculation involves calling nearest() method of each constituent Arc. Overridden from base
         class Arc.
