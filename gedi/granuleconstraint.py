@@ -1,18 +1,19 @@
 """
-This module contains tools for determining whether a GEDI granule has data within a region of interest.
+This module contains tools for determining whether a gedi granule has data within a region of interest.
 """
+from typing import List
 
 import numpy as np
 import re
 from abc import abstractmethod, ABC
 
-from GEDI.api import GEDIAPI
+from gedi.api import GEDIAPI
 from Spherical.arc import Polygon, SimplePiecewiseArc
 
 
 class GranuleConstraint(ABC):
     """
-    Functor used to apply granule-level constraints on GEDI data. Returns True for granules intersecting a region of
+    Functor used to apply granule-level constraints on gedi data. Returns True for granules intersecting a region of
     interest.
     """
 
@@ -40,17 +41,24 @@ class GranuleConstraint(ABC):
     def _checkpoly(self, poly: Polygon) -> bool:
         """Apply the constraint to a granule's bounding polygon."""
 
-    def __call__(self, url: str) -> tuple[bool, str]:
+    def __call__(self, url: str, existing_urls: List[str] = None) -> tuple[bool, str]:
         """
         Determine whether the granule, indicated by the url of its associated xml file, passes the constraint.
         Return whether the granule passed, followed by the url itself.
         """
-        poly = self.getboundingpolygon(url)
-        return self._checkpoly(poly), url
+        try:
+            if existing_urls is not None and url in existing_urls:
+                return None, None
+            print(url)
+            poly = self.getboundingpolygon(url)
+            return self._checkpoly(poly), url
+        except:
+            print('error', url)
+            return None, None
 
 
 class RegionGC(GranuleConstraint):
-    """Accepts GEDI granules only whose bounding polygons interest a region defined by a closed SimplePiecewiseArc."""
+    """Accepts gedi granules only whose bounding polygons interest a region defined by a closed SimplePiecewiseArc."""
 
     def __init__(self, region: SimplePiecewiseArc, api: GEDIAPI):
         """

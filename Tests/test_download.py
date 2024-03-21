@@ -4,9 +4,9 @@ import pickle
 
 import pandas as pd
 
-from GEDI.download import downloadandfilterurls
-from GEDI.shotconstraint import LatLonBox, Buffer
-from GEDI.api import L2AAPI
+from gedi.download import downloadandfilterurls
+from gedi.shotconstraint import LatLonBox, Buffer
+from gedi.api import L2A
 
 
 def test_lonlatbox_across_idl():
@@ -21,7 +21,7 @@ def test_lonlatbox_across_idl():
     })
     data = downloadandfilterurls(
         granule_urls,
-        L2AAPI(),
+        L2A(),
         ["BEAM0101"],
         keepobj,
         shotconstraint=shotconstraint,
@@ -52,7 +52,7 @@ def test_buffered_cities():
     })
     data = downloadandfilterurls(
         urls,
-        L2AAPI(),
+        L2A(),
         ['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],
         keepobj=keepobj,
         shotconstraint=Buffer(500000, cities),

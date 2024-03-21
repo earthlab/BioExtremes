@@ -1,6 +1,6 @@
 """
 This module provides a single public method, downloadandfilterurls(), which allows users to download data from a list
-of GEDI granules, while specifying granule-level and shot-level constraints.
+of gedi granules, while specifying granule-level and shot-level constraints.
 """
 
 from typing import Callable
@@ -11,8 +11,8 @@ from concurrent import futures
 from tqdm import tqdm
 import time
 
-from GEDI.api import GEDIAPI
-from GEDI.shotconstraint import ShotConstraint
+from gedi.api import GEDIAPI
+from gedi.shotconstraint import ShotConstraint
 
 
 def _subsetbeam(
@@ -78,7 +78,7 @@ def _subsetgranule(
 
 def _processgranule(args: tuple) -> pd.DataFrame:
     """
-    Filter multiple beams from a GEDI granule. Inputs are taken in a single tuple for compatibility with
+    Filter multiple beams from a gedi granule. Inputs are taken in a single tuple for compatibility with
     multiprocessing.Pool.imap_unordered. Granule id is added to dataframe.
 
     :param args: Contains, in order, the remote url to the data, an appropriate GEDIAPI object to access that link,
@@ -116,7 +116,7 @@ def downloadandfilterurls(
         progess_bar: bool = True
 ) -> pd.DataFrame:
     """
-    Filter data from a collection of GEDI granules in parallel, combining all shots meeting a constraint into
+    Filter data from a collection of gedi granules in parallel, combining all shots meeting a constraint into
     a single dataframe/csv file. Files enter processing in lexigraphic order, but no guarantee on the output order of
     the data is possible unless nproc = 1. Additional columns added to the dataframe hold the granule id (e.g.
     "GEDI02_A_2020146010156_O08211_01_T02527_02_003_01_V002") and the beam name (e.g. "BEAM0101") of each shot.
@@ -139,17 +139,17 @@ def downloadandfilterurls(
     urls = sorted(urls)
     argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint, outdir) for link in urls if not
     os.path.exists(os.path.join(outdir, os.path.basename(link)))]
-    for arg in argslist:
-        _processgranule(arg)
-    # print(len(argslist))
-    # if progess_bar:
-    #     print(f"Filtering {nproc} files at a time; progress so far:")
-    # with futures.ThreadPoolExecutor(nproc) as executor:
-    #     if progess_bar:
-    #         progress_bar = tqdm(total=len(argslist))
-    #     for arg in argslist:
-    #         executor.submit(_processgranule, arg)
-    #         if progess_bar:
-    #             progress_bar.update(1)  # Update progress bar immediately upon submission
-    #     if progess_bar:
-    #         progress_bar.close()
+    # for arg in argslist:
+    #     _processgranule(arg)
+    print(len(argslist))
+    if progess_bar:
+        print(f"Filtering {nproc} files at a time; progress so far:")
+    with futures.ThreadPoolExecutor(nproc) as executor:
+        if progess_bar:
+            progress_bar = tqdm(total=len(argslist))
+        for arg in argslist:
+            executor.submit(_processgranule, arg)
+            if progess_bar:
+                progress_bar.update(1)  # Update progress bar immediately upon submission
+        if progess_bar:
+            progress_bar.close()

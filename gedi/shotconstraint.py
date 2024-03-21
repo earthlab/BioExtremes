@@ -1,5 +1,5 @@
 """
-This module contains objects which enforce row-by-row contraints on DataFrames of GEDI shots.
+This module contains objects which enforce row-by-row contraints on DataFrames of gedi shots.
 """
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ R_earth = 6378100   # equatorial radius in meters (astropy)
 
 class ShotConstraint:
     """
-    Base class for a functor which subsets a dataframe of GEDI shots. Automatically discards shots whose 'quality_flag'
+    Base class for a functor which subsets a dataframe of gedi shots. Automatically discards shots whose 'quality_flag'
     entries are not 1 and whose 'degrade_flag' entries are not 0. Subclasses enforce additional constraints.
     """
 

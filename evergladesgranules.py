@@ -4,8 +4,8 @@ from concurrent import futures
 import numpy as np
 import json
 from Spherical.arc import Polygon
-from GEDI.granuleconstraint import RegionGC
-from GEDI.api import L2AAPI
+from gedi.granuleconstraint import RegionGC
+from gedi.api import L2A
 
 import matplotlib.pyplot as plt
 
@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 Create an L2AAPI object to access the granules' metadata. This initialization 
 will fail if the credentials in BEX_USER and BEX_PWD are invalid.
 """
-api = L2AAPI()
+api = L2A()
 
 """
 Create a granuleconstraint.GranuleConstraint functor which excludes granules outside 
@@ -37,7 +37,7 @@ plt.plot(latlon[1], latlon[0])
 plt.show()
 
 """
-Obtain an iterator over every L2A file in the GEDI archive with the '.xml' 
+Obtain an iterator over every L2A file in the gedi archive with the '.xml' 
 extension from January 2020.
 """
 urls = api.urls_in_date_range(
