@@ -12,18 +12,19 @@ from bin.find_gedi_files_overlapping_mangroves import generate_overlap_output_fi
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
 
-# path to output of find_gedi_files_overlapping_mangroves.py
-outfile = "L2A_gedi_files_overlapping_mangroves.csv"
-
-# path to gmw 2020 folder
-gmwdir = "gmw_v3_2020/"
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--file_level', type=str, help='Product level to download (L2A, L2B, L1B)',
                         required=True)
+    parser.add_argument('--overlapping_file_csv', type=str,
+                        help='Path to csv file containing overlapping GEDI granules')
+    parser.add_argument('--gmw_dir', type=str,
+                        help='Path to directory containing overlapping mangrove tif files')
     args = parser.parse_args()
+
+    overlapping_file_csv = args.overlapping_file_csv
+    gmw_dir = args.gmw_dir
 
     file_level = GEDILevel[args.file_level]
     url_df = pd.read_csv(generate_overlap_output_file(file_level))
@@ -42,8 +43,8 @@ if __name__ == "__main__":
     api.check_credentials()
 
     print('Loading gmw points into a Buffer (may take a while)...')
-    tilenames = gmw.get_tile_names(gmwdir)
-    points = gmw.get_mangrove_locations_from_tiles(gmwdir, tilenames)
+    tilenames = gmw.get_tile_names(gmw_dir)
+    points = gmw.get_mangrove_locations_from_tiles(gmw_dir, tilenames)
     buffer = Buffer(30.0, points)   # 30 meter buffer (dataset is ~20 meter resolution)
 
     # this argument has us download latitude, longitude, and rh98.
