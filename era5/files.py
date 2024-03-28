@@ -3,6 +3,7 @@ import netCDF4 as nc
 from typing import List
 import numpy as np
 import rasterio
+from datetime import datetime, timedelta
 from rasterio.transform import from_origin
 from rasterio.enums import Resampling
 from rasterio.warp import reproject, Resampling
@@ -33,17 +34,33 @@ def numpy_array_to_raster(array, top_left, hours_from_epoch, output_file):
             dst.update_tags(i + 1, HOURS_FROM_EPOCH=str(hours_from_epoch[i]))
 
 
-def create_filtered_instantaneous_file(input_file: str, output_file: str, hours: List[int], variable: str = 'I10FG'):
+def create_filtered_monthly_file(input_file: str, output_file: str, variable: str = 'TP'):
     input_raster = nc.Dataset(input_file)
+    print(input_raster[variable].shape)
 
-    hours_from_epoch = []
     data = []
-    for i, initial_time in enumerate(input_raster['forecast_initial_time'][:]):
-        for j, forecast_hour in enumerate(input_raster['forecast_hour'][:]):
-            if forecast_hour in hours:
-                hours_from_epoch.append(initial_time + forecast_hour)
-                data.append(input_raster[variable][j, i, :])
+    hours_from_epoch = []
+    for i, initial_time in enumerate(input_raster['time'][:]):
+        hours_from_epoch.append(initial_time)
+        data.append(input_raster[variable][i, :, :])
 
     numpy_array_to_raster(np.array(data), (input_raster['longitude'][0], input_raster['latitude'][0]),
                           hours_from_epoch, output_file)
 
+
+def create_filtered_instantaneous_file(input_file: str, output_file: str, hours: List[int], variable: str = 'I10FG'):
+    input_raster = nc.Dataset(input_file)
+    print(input_raster[variable].shape)
+
+    epoch_time = datetime(1900, 1, 1)
+    hours_from_epoch = []
+    data = []
+    for i, initial_time in enumerate(input_raster['forecast_initial_time'][:]):
+        for j, forecast_hour in enumerate(input_raster['forecast_hour'][:]):
+            hour_of_day = (epoch_time + timedelta(hours=int(initial_time + forecast_hour))).hour
+            if hour_of_day in hours:
+                hours_from_epoch.append(initial_time + forecast_hour)
+                data.append(input_raster[variable][i, j, :])
+
+    numpy_array_to_raster(np.array(data), (input_raster['longitude'][0], input_raster['latitude'][0]),
+                          hours_from_epoch, output_file)

@@ -18,6 +18,7 @@ def get_tile_corners(tilename: str) -> np.ndarray:
     [146, 146, 147, 147]].
     """
     lat = re.search(r"[NS](\d+)[EW]", tilename)
+    print(tilename)
     if lat.group(0).startswith('N'):
         lat = int(lat.group(1))
     else:
@@ -42,6 +43,8 @@ def get_tile_names(gmwdir: str) -> list[str]:
     """
     result = []
     for tilename in os.listdir(gmwdir):
+        if tilename.startswith('.'):
+            continue
         result.append(tilename)
     return result
 

@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from enums import GEDILevel
 from gmw import gmw
-from gedi.api import L2A
+from gedi.api import L2A, L2B, L1B
 from gedi.shotconstraint import Buffer
 from gedi.download import downloadandfilterurls
 from bin.find_gedi_files_overlapping_mangroves import generate_overlap_output_file
@@ -30,7 +30,15 @@ if __name__ == "__main__":
     urls = [u for i, u in enumerate(url_df['url']) if url_df['accepted'][i]]
 
     print("Checking authentication with https://urs.earthdata.nasa.gov...")
-    api = L2A()
+
+    if file_level == 'L2A':
+        api = L2A()
+    elif file_level == 'L2B':
+        api = L2B()
+    elif file_level == 'L1B':
+        api = L1B()
+    else:
+        raise ValueError('Invalid file level')
     api.check_credentials()
 
     print('Loading gmw points into a Buffer (may take a while)...')
