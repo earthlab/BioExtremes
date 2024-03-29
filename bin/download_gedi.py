@@ -28,15 +28,15 @@ if __name__ == "__main__":
 
     file_level = GEDILevel[args.file_level]
     url_df = pd.read_csv(generate_overlap_output_file(file_level))
-    urls = [u for i, u in enumerate(url_df['url']) if url_df['accepted'][i]]
+    urls = [u.replace(".xml", "") for i, u in enumerate(url_df['url']) if url_df['accepted'][i]]
 
     print("Checking authentication with https://urs.earthdata.nasa.gov...")
 
-    if file_level == 'L2A':
+    if file_level == GEDILevel.L2A:
         api = L2A()
-    elif file_level == 'L2B':
+    elif file_level == GEDILevel.L2B:
         api = L2B()
-    elif file_level == 'L1B':
+    elif file_level == GEDILevel.L1B:
         api = L1B()
     else:
         raise ValueError('Invalid file level')
