@@ -1,14 +1,12 @@
 import os
-import re
 import pandas as pd
 from argparse import ArgumentParser
 
 from enums import GEDILevel
 from gmw import gmw
-from gedi.api import L2A, L2B, L1B
+from gedi.api import L2A, L2B
 from gedi.shotconstraint import Buffer
-from gedi.download import downloadandfilterurls
-from bin.find_gedi_files_overlapping_mangroves import generate_overlap_output_file
+from gedi.download import download_and_filter_urls
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -21,46 +19,52 @@ if __name__ == "__main__":
                         help='Path to csv file containing overlapping GEDI granules')
     parser.add_argument('--gmw_dir', type=str,
                         help='Path to directory containing overlapping mangrove tif files')
+    parser.add_argument('--out_dir', type=str, help='Directory to write the output files to')
     args = parser.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
 
     overlapping_file_csv = args.overlapping_file_csv
     gmw_dir = args.gmw_dir
 
     file_level = GEDILevel[args.file_level]
-    url_df = pd.read_csv(generate_overlap_output_file(file_level))
+    url_df = pd.read_csv(overlapping_file_csv)
     urls = [u.replace(".xml", "") for i, u in enumerate(url_df['url']) if url_df['accepted'][i]]
 
     print("Checking authentication with https://urs.earthdata.nasa.gov...")
 
     if file_level == GEDILevel.L2A:
         api = L2A()
+        keep_obj = pd.DataFrame({
+            'key': ['lat_lowestmode', 'lon_lowestmode', 'rh'],
+            'index': [None, None, 98],
+            'name': ['latitude', 'longitude', 'rh98']
+        })
+
     elif file_level == GEDILevel.L2B:
         api = L2B()
-    elif file_level == GEDILevel.L1B:
-        api = L1B()
+        keep_obj = pd.DataFrame({
+            'key': ['geolocation/latitude_bin0', 'geolocation/longitude_bin0', 'fhd_normal', 'pai'],
+            'index': [None, None, None, None],
+            'name': ['latitude', 'longitude', 'fhd', 'pai']
+        })
+
     else:
         raise ValueError('Invalid file level')
     api.check_credentials()
 
     print('Loading gmw points into a Buffer (may take a while)...')
-    tilenames = gmw.get_tile_names(gmw_dir)
-    points = gmw.get_mangrove_locations_from_tiles(gmw_dir, tilenames)
-    buffer = Buffer(30.0, points)   # 30 meter buffer (dataset is ~20 meter resolution)
+    tile_names = gmw.get_tile_names(gmw_dir)
+    points = gmw.get_mangrove_locations_from_tiles(gmw_dir, tile_names)
+    buffer = Buffer(30.0, points, file_level)   # 30 meter buffer (dataset is ~20 meter resolution)
 
-    # this argument has us download latitude, longitude, and rh98.
-    keepobj = pd.DataFrame({
-        'key': ['lat_lowestmode', 'lon_lowestmode', 'rh'],
-        'index': [None, None, 98],
-        'name': ['latitude', 'longitude', 'rh98']
-    })
-
-    downloadandfilterurls(
+    download_and_filter_urls(
         urls,
         api=api,
-        beamnames=['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],     # full power beams
-        keepobj=keepobj,
-        keepevery=1,
-        shotconstraint=buffer,
+        beam_names=['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],     # full power beams
+        keep_obj=keep_obj,
+        shot_constraint=buffer,
+        keep_every=1,
         nproc=4,
-        outdir='mangrove_out'
+        out_dir=args.out_dir
     )

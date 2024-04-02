@@ -15,68 +15,64 @@ from gedi.api import GEDIAPI
 from gedi.shotconstraint import ShotConstraint
 
 
-def _subsetbeam(
+def _subset_beam(
         granule,
         beam: str,
-        keepobj: pd.DataFrame,
-        keepevery: int,
-        constraindf: ShotConstraint,
+        keep_obj: pd.DataFrame,
+        keep_every: int,
+        constraint_df: ShotConstraint,
 ) -> pd.DataFrame:
     """
     Subset the data from a single beam from a granule, so that only shots meeting a constraint are kept.
     Beam name is added to the dataframe.
     """
-    t1 = time.time()
     granule = h5py.File(granule, 'r')
     df = {}
-    keys = list(keepobj['key']) + constraindf.getkeys()
-    names = list(keepobj['name']) + constraindf.getkeys()
-    indices = list(keepobj['index']) + [None for _ in constraindf.getkeys()]
+    keys = list(keep_obj['key']) + constraint_df.get_keys()
+    names = list(keep_obj['name']) + constraint_df.get_keys()
+    indices = list(keep_obj['index']) + [None for _ in constraint_df.get_keys()]
     for key, name, idx in zip(keys, names, indices):
         try:
             obj = beam + '/' + key
             try:
                 idx = int(idx)
-                df[name] = granule[obj][()][::keepevery, int(idx)]
+                df[name] = granule[obj][()][::keep_every, int(idx)]
             except (ValueError, TypeError):  # idx cannot be cast to int
-                df[name] = granule[obj][()][::keepevery]
+                df[name] = granule[obj][()][::keep_every]
         except KeyError:
             # TODO: what is happening? At least print the name of the file
             print(f'Download failed: could not receive data from {obj}')
             return
     df = pd.DataFrame(df)
-    constraindf(df)
-    df.drop(columns=[col for col in names if not (col == keepobj['name']).any()], inplace=True)
+    constraint_df(df)
+    df.drop(columns=[col for col in names if not (col == keep_obj['name']).any()], inplace=True)
     # add beam name to df
     df['beam'] = [beam for _ in range(df.shape[0])]
-    print(time.time() - t1, 'subsetbeam')
     return df
 
 
-def _subsetgranule(
+def _subset_granule(
         granule,
-        beamnames: list[str],
-        keepobj: dict[str, str],
-        keepevery: int,
-        constraindf: ShotConstraint
+        beam_names: list[str],
+        keep_obj: pd.DataFrame,
+        keep_every: int,
+        constraint_df: ShotConstraint
 ) -> pd.DataFrame:
     """
     First parameter is a file-like object with data to filter. Subsequent parameters are the beamnames, keepobj,
     keepevery, and shotconstraint arguments as used by downloadandfilterl2aurls(). Return a dataframe with the filtered
     data, or nothing if no data is extracted.
     """
-    t1 = time.time()
     frames = []
-    for beamname in beamnames:
-        df = _subsetbeam(granule, beamname, keepobj, keepevery=keepevery, constraindf=constraindf)
+    for beamname in beam_names:
+        df = _subset_beam(granule, beamname, keep_obj, keep_every=keep_every, constraint_df=constraint_df)
         if df is not None:
             frames.append(df)
     out_frame = pd.concat(frames, ignore_index=True)
-    print(time.time() - t1, 'subsetgranule')
     return out_frame
 
 
-def _processgranule(args: tuple) -> pd.DataFrame:
+def _process_granule(args: tuple):
     """
     Filter multiple beams from a gedi granule. Inputs are taken in a single tuple for compatibility with
     multiprocessing.Pool.imap_unordered. Granule id is added to dataframe.
@@ -86,35 +82,33 @@ def _processgranule(args: tuple) -> pd.DataFrame:
                     downloadandfilterl2aurls().
     :return: Filtered data from all beams. Return nothing if no data is extracted.
     """
-    link, api, beamnames, keepobj, keepevery, constraindf, outdir = args
+    link, api, beam_names, keep_obj, keep_every, constraint_df, out_dir = args
     # download and filter large h5 file
-    t1 = time.time()
     df = api.process_in_memory_file(
         link,
-        _subsetgranule,
-        beamnames, keepobj, keepevery, constraindf
+        _subset_granule,
+        beam_names, keep_obj, keep_every, constraint_df
     )
-    print(time.time() - t1, 'in memory')
     # add granule id to df
     istart = link.rindex('/') + 1
     iend = link.rindex('.')
     granule_id = link[istart:iend]
     df['granule_id'] = [granule_id for _ in range(df.shape[0])]
     print(f'Writing {link}')
-    df.to_csv(os.path.join(outdir, os.path.basename(link)))
+    df.to_csv(os.path.join(out_dir, os.path.basename(link)))
 
 
-def downloadandfilterurls(
+def download_and_filter_urls(
         urls: list[str],
         api: GEDIAPI,
-        beamnames: list[str],
-        keepobj: pd.DataFrame,
-        keepevery: int = 50,
-        shotconstraint: ShotConstraint = ShotConstraint(),
+        beam_names: list[str],
+        keep_obj: pd.DataFrame,
+        shot_constraint: ShotConstraint,
+        keep_every: int = 50,
         nproc: int = 1,
-        outdir: str = None,
+        out_dir: str = None,
         progess_bar: bool = True
-) -> pd.DataFrame:
+):
     """
     Filter data from a collection of gedi granules in parallel, combining all shots meeting a constraint into
     a single dataframe/csv file. Files enter processing in lexigraphic order, but no guarantee on the output order of
@@ -132,23 +126,19 @@ def downloadandfilterurls(
     :param keepevery: create a representative sample using only one in every keep_every shots.
     :param shotconstraint: A ShotConstraint object to be applied to the resulting DataFrame.
     :param nproc: Number of parallel processes.
-    :param csvdest: Optional absolute path to a csv file where all data is written.
     :return: A dataframe with the filtered data from every granule
     :param progess_bar: If set to False, the progress bar is not printed. True by default.
     """
     urls = sorted(urls)
-    argslist = [(link, api, beamnames, keepobj, keepevery, shotconstraint, outdir) for link in urls if not
-    os.path.exists(os.path.join(outdir, os.path.basename(link)))]
-    # for arg in argslist:
-    #     _processgranule(arg)
-    print(len(argslist))
+    args_list = [(link, api, beam_names, keep_obj, keep_every, shot_constraint, out_dir) for link in urls if not
+    os.path.exists(os.path.join(out_dir, os.path.basename(link)))]
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
     with futures.ThreadPoolExecutor(nproc) as executor:
         if progess_bar:
-            progress_bar = tqdm(total=len(argslist))
-        for arg in argslist:
-            executor.submit(_processgranule, arg)
+            progress_bar = tqdm(total=len(args_list))
+        for arg in args_list:
+            executor.submit(_process_granule, arg)
             if progess_bar:
                 progress_bar.update(1)  # Update progress bar immediately upon submission
         if progess_bar:
