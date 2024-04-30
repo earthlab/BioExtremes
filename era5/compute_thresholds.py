@@ -77,34 +77,34 @@ class ComputeThresholds:
                                                  self._threshold_date_end):
                 continue
 
-            raster = gdal.Open(os.path.join(era5_dir, file))
-            a = raster.ReadAsArray()
-            a = a.reshape(a.shape[0], -1)
+            try:
+                raster = gdal.Open(os.path.join(era5_dir, file))
+                a = raster.ReadAsArray()
+                a = a.reshape(a.shape[0], -1)
+            except AttributeError as e:
+                print(f'Raster error with {file}, skipping')
+                continue
 
             for i, mangrove_flag in enumerate(mangrove_locations):
                 if mangrove_flag:
-                    v = func(a[:, i])
-                    if isinstance(v, list):
-                        value_dict[i].extend(v)
-                    else:
-                        value_dict[i].append(v)
+                    value_dict[i].extend(a[:, i])
 
         return value_dict
 
-    def compute_era5_total_precipitation_threshold(self, era5_dir, outfile: str):
-        era5_raster = gdal.Open(os.path.join(era5_dir, os.listdir(era5_dir)[0]))
-        mangrove_locations = self._calculate_mangrove_locations(era5_raster)
-        value_dict = self._calculate_value_dict(mangrove_locations, era5_dir, func=np.sum)
-
-        projection = era5_raster.GetProjection()
-        x_size, y_size = era5_raster.RasterXSize, era5_raster.RasterYSize
-        geo_transform = era5_raster.GetGeoTransform()
-        output_array = np.zeros(x_size * y_size)
-        for k, v in value_dict.items():
-            output_array[k] = np.percentile(v, self._percentile)
-
-        output_array = output_array.reshape((y_size, x_size))
-        self._write_raster(x_size, y_size, geo_transform, projection, output_array, outfile)
+    # def compute_era5_total_precipitation_threshold(self, era5_dir, outfile: str):
+    #     era5_raster = gdal.Open(os.path.join(era5_dir, os.listdir(era5_dir)[0]))
+    #     mangrove_locations = self._calculate_mangrove_locations(era5_raster)
+    #     value_dict = self._calculate_value_dict(mangrove_locations, era5_dir, func=)
+    #
+    #     projection = era5_raster.GetProjection()
+    #     x_size, y_size = era5_raster.RasterXSize, era5_raster.RasterYSize
+    #     geo_transform = era5_raster.GetGeoTransform()
+    #     output_array = np.zeros(x_size * y_size)
+    #     for k, v in value_dict.items():
+    #         output_array[k] = np.percentile(v, self._percentile)
+    #
+    #     output_array = output_array.reshape((y_size, x_size))
+    #     self._write_raster(x_size, y_size, geo_transform, projection, output_array, outfile)
 
     def compute_era5_wind_speed_threshold(self, era5_dir: str, outfile: str):
         era5_raster = gdal.Open(os.path.join(era5_dir, os.listdir(era5_dir)[0]))
