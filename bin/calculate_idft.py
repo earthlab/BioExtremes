@@ -22,4 +22,4 @@ if __name__ == '__main__':
         sys.exit(2)
 
     e.create_idft_tif(args.in_dir, datetime(1979, 1, 1), datetime(args.end_year, 12, 31),
-                      month_window=1, outfile=args.out_file)
+                      window=1, outfile=args.out_file)

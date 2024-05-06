@@ -34,7 +34,7 @@ class Base:
         i = 0. if not i else max(i)
         d = 0. if not d else max(d)
         f = len(matches) / values.shape[0]
-        t = len(bits) - matches[-1].end()
+        t = (len(bits) - matches[-1].end()) if matches else np.nan
 
         return i, d, f, t
 
@@ -42,14 +42,18 @@ class Base:
     def _write_raster(x_size, y_size, geo_transform, projection, intensity_array, duration_array, frequency_array,
                       time_array, outfile):
         driver = gdal.GetDriverByName('GTiff')
-        output_dataset = driver.Create(outfile, x_size, y_size, 3, gdal.GDT_Float32)
+        output_dataset = driver.Create(outfile, x_size, y_size, 4, gdal.GDT_Float32)
         output_dataset.SetGeoTransform(geo_transform)
         output_dataset.SetProjection(projection)
 
-        output_dataset.GetRasterBand(1).WriteArray(intensity_array)
-        output_dataset.GetRasterBand(2).WriteArray(duration_array)
-        output_dataset.GetRasterBand(3).WriteArray(frequency_array)
-        output_dataset.GetRasterBand(4).WriteArray(time_array)
+        # Loop through each raster band and write the arrays
+        for i, array in enumerate([intensity_array, duration_array, frequency_array, time_array], start=1):
+            band = output_dataset.GetRasterBand(i)
+            band.WriteArray(array)
+            band.SetNoDataValue(-1)
+
+        # Close the dataset
+        output_dataset = None
 
     def create_idft_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str,
                         transform=lambda x: x):
@@ -98,7 +102,7 @@ class Base:
         intensity_array = np.zeros((y_size, x_size))
         duration_array = np.zeros((y_size, x_size))
         frequency_array = np.zeros((y_size, x_size))
-        time_array = np.zeros((y_size, x_size))
+        time_array = np.full((y_size, x_size), fill_value=-1)
         for k, v in idft_dict.items():
             intensity_array[k] = v[0]
             duration_array[k] = v[1]
