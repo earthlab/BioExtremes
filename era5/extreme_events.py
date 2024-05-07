@@ -33,8 +33,9 @@ class Base:
         # report time since last event, frequency, and maximum intensity / duration
         i = 0. if not i else max(i)
         d = 0. if not d else max(d)
+
         f = len(matches) / values.shape[0]
-        t = (len(bits) - matches[-1].end()) if matches else np.nan
+        t = (len(bits) - matches[-1].end()) if matches else values.shape[0]
 
         return i, d, f, t
 
@@ -42,15 +43,16 @@ class Base:
     def _write_raster(x_size, y_size, geo_transform, projection, intensity_array, duration_array, frequency_array,
                       time_array, outfile):
         driver = gdal.GetDriverByName('GTiff')
-        output_dataset = driver.Create(outfile, x_size, y_size, 4, gdal.GDT_Float32)
+        output_dataset = driver.Create(outfile, x_size, y_size, 4, gdal.GDT_Float64)
         output_dataset.SetGeoTransform(geo_transform)
         output_dataset.SetProjection(projection)
 
         # Loop through each raster band and write the arrays
         for i, array in enumerate([intensity_array, duration_array, frequency_array, time_array], start=1):
+
             band = output_dataset.GetRasterBand(i)
             band.WriteArray(array)
-            band.SetNoDataValue(-1)
+            band.SetNoDataValue(-1.0)
 
         # Close the dataset
         output_dataset = None
@@ -99,10 +101,10 @@ class Base:
             idft_dict[k] = self._calc_idft(v, np.array(value_dict[k]), self._threshold_array[k], window)
 
         x_size, y_size = self._threshold_raster.RasterXSize, self._threshold_raster.RasterYSize
-        intensity_array = np.zeros((y_size, x_size))
-        duration_array = np.zeros((y_size, x_size))
-        frequency_array = np.zeros((y_size, x_size))
-        time_array = np.full((y_size, x_size), fill_value=-1)
+        intensity_array = np.full((y_size, x_size), fill_value=-1.0)
+        duration_array = np.full((y_size, x_size), fill_value=-1.0)
+        frequency_array = np.full((y_size, x_size), fill_value=-1.0)
+        time_array = np.full((y_size, x_size), fill_value=-1.0)
         for k, v in idft_dict.items():
             intensity_array[k] = v[0]
             duration_array[k] = v[1]
@@ -131,5 +133,5 @@ class Wind(Base):
         return ((era5_speed * mps2kts * m) + b) / mps2kts
 
     def create_idft_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str):
-        super().create_idft_tif(self, in_dir, start_date, end_date, window, outfile,
+        super().create_idft_tif(in_dir, start_date, end_date, window, outfile,
                                 transform=self._convert_era5_wind_speed_to_ibtracs)
