@@ -62,6 +62,8 @@ class Base:
 
         bits_dict = collections.defaultdict(str)
         value_dict = collections.defaultdict(list)
+
+        sorted_files = []
         for file in os.listdir(in_dir):
 
             match = re.search(self._file_date_pattern, file)
@@ -77,6 +79,13 @@ class Base:
 
             if not (start_date <= file_start_date and end_date >= file_end_date):
                 continue
+
+            sorted_files.append(file)
+
+        sorted_files = sorted(sorted_files,
+                              key=lambda x: datetime.strptime(re.search(self._file_date_pattern, x).group(1), "%Y%m%d%H"))
+        print(sorted_files)
+        for file in sorted_files:
 
             raster = gdal.Open(os.path.join(in_dir, file))
             raster_array = raster.ReadAsArray()
