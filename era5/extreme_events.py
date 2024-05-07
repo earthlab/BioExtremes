@@ -75,7 +75,7 @@ class Base:
             else:
                 continue
 
-            if not (start_date <= file_start_date and end_date <= file_end_date):
+            if not (start_date <= file_start_date and end_date >= file_end_date):
                 continue
 
             raster = gdal.Open(os.path.join(in_dir, file))

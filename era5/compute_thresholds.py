@@ -51,7 +51,7 @@ class ComputeThresholds:
     @staticmethod
     def _write_raster(x_size, y_size, geo_transform, projection, output_array, outfile):
         driver = gdal.GetDriverByName('GTiff')
-        output_dataset = driver.Create(outfile, x_size, y_size, 1, gdal.GDT_Float32)
+        output_dataset = driver.Create(outfile, x_size, y_size, 1, gdal.GDT_Float64)
         output_dataset.SetGeoTransform(geo_transform)
         output_dataset.SetProjection(projection)
 
