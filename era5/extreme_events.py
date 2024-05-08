@@ -44,7 +44,7 @@ class Base:
                 d_t = len(bits) - m.end()
 
             if s_m >= s:
-                s = ()
+                s = s_m
                 s_t = len(bits) - m.end()
 
         # report time since last event, frequency, and maximum intensity / duration
