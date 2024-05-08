@@ -23,32 +23,47 @@ class Base:
         matches = list(re.finditer(regex, bits))
 
         # compute intensity and duration of each EWE
-        i = []
-        d = []
+        i = 0
+        d = 0
+        s = 0
+
+        i_t = values.shape[0]
+        d_t = values.shape[0]
+        s_t = values.shape[0]
         for m in matches:
             event = values[m.start() + 1: m.end()]
-            i.append((event - threshold).sum())
-            d.append(event.shape[0])
+            i_m = (event - threshold).sum()
+            d_m = event.shape[0]
+            s_m = (i_m + d_m) * (m.end() / len(bits))
+            if i_m >= i:
+                i = i_m
+                i_t = len(bits) - m.end()
+
+            if d_m >= d:
+                d = d_m
+                d_t = len(bits) - m.end()
+
+            if s_m >= s:
+                s = ()
+                s_t = len(bits) - m.end()
 
         # report time since last event, frequency, and maximum intensity / duration
-        i = 0. if not i else max(i)
-        d = 0. if not d else max(d)
-
         f = len(matches) / values.shape[0]
         t = (len(bits) - matches[-1].end()) if matches else values.shape[0]
 
-        return i, d, f, t
+        return i, d, f, t, s, i_t, d_t, s_t
 
     @staticmethod
     def _write_raster(x_size, y_size, geo_transform, projection, intensity_array, duration_array, frequency_array,
-                      time_array, outfile):
+                      time_array, s_array, intensity_time_array, duration_time_array, s_time_array, outfile):
         driver = gdal.GetDriverByName('GTiff')
-        output_dataset = driver.Create(outfile, x_size, y_size, 4, gdal.GDT_Float64)
+        output_dataset = driver.Create(outfile, x_size, y_size, 8, gdal.GDT_Float64)
         output_dataset.SetGeoTransform(geo_transform)
         output_dataset.SetProjection(projection)
 
         # Loop through each raster band and write the arrays
-        for i, array in enumerate([intensity_array, duration_array, frequency_array, time_array], start=1):
+        for i, array in enumerate([intensity_array, duration_array, frequency_array, time_array, s_array,
+                                   intensity_time_array, duration_time_array, s_time_array], start=1):
 
             band = output_dataset.GetRasterBand(i)
             band.WriteArray(array)
@@ -114,15 +129,23 @@ class Base:
         duration_array = np.full((y_size, x_size), fill_value=-1.0)
         frequency_array = np.full((y_size, x_size), fill_value=-1.0)
         time_array = np.full((y_size, x_size), fill_value=-1.0)
+        s_array = np.full((y_size, x_size), fill_value=-1.0)
+        intensity_time_array = np.full((y_size, x_size), fill_value=-1.0)
+        duration_time_array = np.full((y_size, x_size), fill_value=-1.0)
+        s_time_array = np.full((y_size, x_size), fill_value=-1.0)
         for k, v in idft_dict.items():
             intensity_array[k] = v[0]
             duration_array[k] = v[1]
             frequency_array[k] = v[2]
             time_array[k] = v[3]
+            s_array[k] = v[4]
+            intensity_time_array[k] = v[5]
+            duration_time_array[k] = v[6]
+            s_time_array[k] = v[7]
 
         self._write_raster(x_size, y_size, self._threshold_raster.GetGeoTransform(),
                            self._threshold_raster.GetProjection(), intensity_array, duration_array, frequency_array,
-                           time_array, outfile)
+                           time_array, s_array, intensity_time_array, duration_time_array, s_time_array, outfile)
 
 
 class Precipitation(Base):
