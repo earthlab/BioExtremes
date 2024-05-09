@@ -32,8 +32,8 @@ class Base:
         s_t = values.shape[0]
         for m in matches:
             event = values[m.start() + 1: m.end()]
-            i_m = (event - threshold).sum()
-            d_m = event.shape[0]
+            i_m = (event - threshold).sum() * (m.end() / len(bits))
+            d_m = event.shape[0] * (m.end() / len(bits))
             s_m = (i_m + d_m) * (m.end() / len(bits))
             if i_m >= i:
                 i = i_m
