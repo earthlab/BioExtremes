@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/682751872.svg)](https://zenodo.org/doi/10.5281/zenodo.11168263)
+
 # BioExtremes
 Project funded by CIRES IRP 2023
 
