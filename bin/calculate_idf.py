@@ -11,15 +11,16 @@ if __name__ == '__main__':
     args.add_argument('--out_file')
     args.add_argument('--type')
     args.add_argument('--end_year', type=int)
+    args.add_argument('--window', type=int)
 
     args = args.parse_args()
 
     if args.type == 'wind':
         e = Wind(args.thresh)
-    elif args.type == 'rain':
+    elif args.type == 'precipitation':
         e = Precipitation(args.thresh)
     else:
         sys.exit(2)
 
-    e.create_idft_tif(args.in_dir, datetime(1979, 1, 1), datetime(args.end_year, 12, 31),
-                      window=1, outfile=args.out_file)
+    e.create_idf_tif(args.in_dir, datetime(1979, 1, 1), datetime(args.end_year, 12, 31),
+                     window=args.window, outfile=args.out_file)

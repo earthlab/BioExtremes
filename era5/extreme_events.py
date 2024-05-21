@@ -14,56 +14,28 @@ class Base:
         self._threshold_array = self._threshold_raster.ReadAsArray()
         self._file_date_pattern = r'(\d{10})_(\d{10})'
 
-    @staticmethod
-    def _calc_idft(bits: str, values: np.array, threshold: float, min_duration: int):
+    def _calc_idf(self, bits: str, values: np.array, threshold: float, min_duration: int):
         # find EWEs
         regex = '0('  # start below threshold
         regex += ''.join(['1' for _ in range(min_duration)])  # remain above threshold for ndays
         regex += '*1)'  # any additional time above threshold counts too
         matches = list(re.finditer(regex, bits))
 
-        # compute intensity and duration of each EWE
-        i = 0
-        d = 0
-        s = 0
+        if not matches:
+            print('No matches')
 
-        i_t = values.shape[0]
-        d_t = values.shape[0]
-        s_t = values.shape[0]
-        for m in matches:
-            event = values[m.start() + 1: m.end()]
-            i_m = (event - threshold).sum() * (m.end() / len(bits))
-            d_m = event.shape[0] * (m.end() / len(bits))
-            s_m = (i_m + d_m) * (m.end() / len(bits))
-            if i_m >= i:
-                i = i_m
-                i_t = len(bits) - m.end()
-
-            if d_m >= d:
-                d = d_m
-                d_t = len(bits) - m.end()
-
-            if s_m >= s:
-                s = s_m
-                s_t = len(bits) - m.end()
-
-        # report time since last event, frequency, and maximum intensity / duration
-        f = len(matches) / values.shape[0]
-        t = (len(bits) - matches[-1].end()) if matches else values.shape[0]
-
-        return i, d, f, t, s, i_t, d_t, s_t
+        return matches, 0, 0
 
     @staticmethod
     def _write_raster(x_size, y_size, geo_transform, projection, intensity_array, duration_array, frequency_array,
-                      time_array, s_array, intensity_time_array, duration_time_array, s_time_array, outfile):
+                      outfile):
         driver = gdal.GetDriverByName('GTiff')
         output_dataset = driver.Create(outfile, x_size, y_size, 8, gdal.GDT_Float64)
         output_dataset.SetGeoTransform(geo_transform)
         output_dataset.SetProjection(projection)
 
         # Loop through each raster band and write the arrays
-        for i, array in enumerate([intensity_array, duration_array, frequency_array, time_array, s_array,
-                                   intensity_time_array, duration_time_array, s_time_array], start=1):
+        for i, array in enumerate([intensity_array, duration_array, frequency_array], start=1):
 
             band = output_dataset.GetRasterBand(i)
             band.WriteArray(array)
@@ -72,8 +44,8 @@ class Base:
         # Close the dataset
         output_dataset = None
 
-    def create_idft_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str,
-                        transform=lambda x: x):
+    def create_idf_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str,
+                       threshold_functor, transform=lambda x: x):
 
         bits_dict = collections.defaultdict(str)
         value_dict = collections.defaultdict(list)
@@ -99,7 +71,6 @@ class Base:
 
         sorted_files = sorted(sorted_files,
                               key=lambda x: datetime.strptime(re.search(self._file_date_pattern, x).group(1), "%Y%m%d%H"))
-        print(sorted_files)
         for file in sorted_files:
 
             raster = gdal.Open(os.path.join(in_dir, file))
@@ -114,7 +85,8 @@ class Base:
                     if threshold <= 0:
                         continue
 
-                    bits_dict[(j, i)] += ''.join(['1' if transform(v) > threshold else '0' for v in raster_array[:, j, i]])
+                    bits_dict[(j, i)] += ''.join(['1' if threshold_functor(transform(v), threshold) else '0' for v in
+                                                  raster_array[:, j, i]])
                     value_dict[(j, i)].extend([transform(v) for v in raster_array[:, j, i]])
 
             del raster
@@ -122,40 +94,72 @@ class Base:
 
         idft_dict = {}
         for k, v in bits_dict.items():
-            idft_dict[k] = self._calc_idft(v, np.array(value_dict[k]), self._threshold_array[k], window)
+            idft_dict[k] = self._calc_idf(v, np.array(value_dict[k]), self._threshold_array[k], window)
 
         x_size, y_size = self._threshold_raster.RasterXSize, self._threshold_raster.RasterYSize
         intensity_array = np.full((y_size, x_size), fill_value=-1.0)
         duration_array = np.full((y_size, x_size), fill_value=-1.0)
         frequency_array = np.full((y_size, x_size), fill_value=-1.0)
-        time_array = np.full((y_size, x_size), fill_value=-1.0)
-        s_array = np.full((y_size, x_size), fill_value=-1.0)
-        intensity_time_array = np.full((y_size, x_size), fill_value=-1.0)
-        duration_time_array = np.full((y_size, x_size), fill_value=-1.0)
-        s_time_array = np.full((y_size, x_size), fill_value=-1.0)
+
         for k, v in idft_dict.items():
             intensity_array[k] = v[0]
             duration_array[k] = v[1]
             frequency_array[k] = v[2]
-            time_array[k] = v[3]
-            s_array[k] = v[4]
-            intensity_time_array[k] = v[5]
-            duration_time_array[k] = v[6]
-            s_time_array[k] = v[7]
 
         self._write_raster(x_size, y_size, self._threshold_raster.GetGeoTransform(),
                            self._threshold_raster.GetProjection(), intensity_array, duration_array, frequency_array,
-                           time_array, s_array, intensity_time_array, duration_time_array, s_time_array, outfile)
+                           outfile)
 
 
 class Precipitation(Base):
     def __init__(self, threshold_tif: str):
         super().__init__(threshold_tif)
 
+    def _calc_idf(self, bits: str, values: np.array, threshold: float, min_duration: int):
+        matches, i, d = super()._calc_idf(bits, values, threshold, min_duration)
+
+        for m in matches:
+            event = values[m.start() + 1: m.end()]
+            i_m = (threshold - event).sum()
+            d_m = event.shape[0]
+
+            if i_m >= i:
+                i = i_m
+
+            if d_m >= d:
+                d = d_m
+
+        # report time since last event, frequency, and maximum intensity / duration
+        f = len(matches) / values.shape[0]
+
+        return i, d, f
+
+    def create_idf_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str):
+        super().create_idf_tif(in_dir, start_date, end_date, window, outfile, threshold_functor=lambda x, y: x <= y)
+
 
 class Wind(Base):
     def __init__(self, threshold_tif: str):
         super().__init__(threshold_tif)
+
+    def _calc_idf(self, bits: str, values: np.array, threshold: float, min_duration: int):
+        matches, i, d = super()._calc_idf(bits, values, threshold, min_duration)
+
+        for m in matches:
+            event = values[m.start() + 1: m.end()]
+            i_m = (event - threshold).sum()
+            d_m = event.shape[0]
+
+            if i_m >= i:
+                i = i_m
+
+            if d_m >= d:
+                d = d_m
+
+        # report time since last event, frequency, and maximum intensity / duration
+        f = len(matches) / values.shape[0]
+
+        return i, d, f
 
     @staticmethod
     def _convert_era5_wind_speed_to_ibtracs(era5_speed: float) -> float:
@@ -164,6 +168,6 @@ class Wind(Base):
 
         return ((era5_speed * mps2kts * m) + b) / mps2kts
 
-    def create_idft_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str):
-        super().create_idft_tif(in_dir, start_date, end_date, window, outfile,
-                                transform=self._convert_era5_wind_speed_to_ibtracs)
+    def create_idf_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str):
+        super().create_idf_tif(in_dir, start_date, end_date, window, outfile, threshold_functor=lambda x, y: x > y,
+                               transform=self._convert_era5_wind_speed_to_ibtracs)
