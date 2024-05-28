@@ -16,18 +16,11 @@ from gedi.granuleconstraint import RegionGC, CompositeGC
 
 
 warnings.filterwarnings("ignore")
-
 PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
-GMW_DIR = os.path.join(PROJECT_DIR, 'data', 'gmw_v3_2020')
-
 nproc = os.cpu_count()
 
 
-def generate_overlap_output_file(file_level: GEDILevel):
-    return os.path.join(PROJECT_DIR, 'data', f'{file_level.value}_gedi_files_overlapping_mangroves_bahamas.csv')
-
-
-def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime, gmw_dir: str = GMW_DIR):
+def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime, gmw_dir: str, output_file: str):
     """
     Use the gmw.gmw module to obtain bounding boxes for each 1x1 degree cell of the global grid containing mangroves.
     """
@@ -46,15 +39,11 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
         api = L2A()
     elif file_level == GEDILevel.L2B:
         api = L2B()
-    elif file_level == GEDILevel.L1B:
-        api = L1B()
     else:
         raise ValueError('Invalid file level')
 
     api.check_credentials()
     print('Credentials valid')
-
-    output_file = generate_overlap_output_file(file_level)
 
     output_df = None
     existing_urls = None
@@ -110,6 +99,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--file_level', type=str, help='Product level to download (L2A, L2B, L1B)',
                         required=True)
+    parser.add_argument('--gmw_dir', type=str, required=True, help='Path to mangrove location files')
+    parser.add_argument('--out_file', type=str, required=True, help='Path to output csv file')
     parser.add_argument('--start_date', type=str, help='Start date of overlap search in YYYY-MM-DD',
                         required=False)
     parser.add_argument('--end_date', type=str, help='End date of overlap search in YYYY-MM-DD',
@@ -121,5 +112,7 @@ if __name__ == "__main__":
         datetime(2019, 4, 18) if args.start_date is None else datetime.strptime(
             args.start_date, '%Y-%m-%d'),
         datetime.today() if args.end_date is None else datetime.strptime(
-            args.end_date, '%Y-%m-%d')
+            args.end_date, '%Y-%m-%d'),
+        args.gmw_dir,
+        args.out_file
     )
