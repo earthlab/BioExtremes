@@ -47,9 +47,8 @@ class GranuleConstraint(ABC):
         Return whether the granule passed, followed by the url itself.
         """
         try:
-            if existing_urls is not None and url in existing_urls:
+            if existing_urls and url in existing_urls:
                 return None, None
-            print(url)
             poly = self.getboundingpolygon(url)
             return self._checkpoly(poly), url
         except:

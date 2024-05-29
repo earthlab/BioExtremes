@@ -20,6 +20,16 @@ PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
 nproc = os.cpu_count()
 
 
+def save_progress(accepted, new_urls, filename):
+    # Create a DataFrame from the lists
+    df = pd.DataFrame({
+        'accepted': accepted,
+        'url': new_urls
+    })
+    # Save the DataFrame to a CSV file
+    df.to_csv(filename, index=False)
+
+
 def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime, gmw_dir: str, output_file: str):
     """
     Use the gmw.gmw module to obtain bounding boxes for each 1x1 degree cell of the global grid containing mangroves.
@@ -45,11 +55,13 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     api.check_credentials()
     print('Credentials valid')
 
-    output_df = None
-    existing_urls = None
-    if os.path.exists(output_file):
-        output_df = pd.read_csv(output_file)
-        existing_urls = list(output_df['url'])
+    checkpoint = output_file.replace('.csv', '_progress.csv')
+    accepted, new_urls = [], []
+    if os.path.exists(checkpoint):
+        checkpoint_df = pd.read_csv(checkpoint)
+        existing_urls = list(checkpoint_df['url'])
+        accepted += list(checkpoint_df['accepted'])
+        new_urls += list(checkpoint_df['url'])
 
     """
     The gedi.granuleconstraint module is used to determine which granules are of interest. In this case, we create a 
@@ -78,21 +90,22 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     information permanently, so that it can be used to selectively download granules for shot-level subsetting. 
     Note that the loop will take a while to get going because ThreadPoolExecutor.map() unpacks the iterable up front.
     """
-    accepted, new_urls = [], []
+    save_interval = 10
     with futures.ThreadPoolExecutor(nproc) as executor:
-        partial_func = partial(constraint, existing_urls=existing_urls)
-        for accept, url in tqdm(executor.map(partial_func, urls)):
+        partial_func = partial(constraint, existing_urls=new_urls)
+        for i, (accept, url) in enumerate(tqdm(executor.map(partial_func, urls))):
             if accept is not None:
                 accepted.append(accept)
                 new_urls.append(url)
 
-    if output_df is not None:
-        accepted += list(output_df['accepted'])
-        new_urls += list(output_df['url'])
+                # Save progress at intervals
+                print(i % save_interval == 0)
+                if i > 0 and i % save_interval == 0:
+                    print('saving')
+                    save_progress(accepted, new_urls, output_file.replace('.csv', f'_checkpoint.csv'))
 
     if accepted and new_urls:
-        new_df = pd.DataFrame({'accepted': accepted, 'url': new_urls})
-        new_df.to_csv(output_file, index=False)
+        save_progress(accepted,  new_urls, output_file)
 
 
 if __name__ == "__main__":

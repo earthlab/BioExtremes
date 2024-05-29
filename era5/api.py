@@ -75,7 +75,6 @@ class MonthlySingleLevelInstantaneous(BaseAPI):
 
     def download(self, start_date: str, end_date: str, out_dir: str, var: str):
         file_links = self.get_available_file_links(start_date, end_date, var)
-        print(file_links)
         os.makedirs(out_dir, exist_ok=True)
 
         opener = urllib.request.build_opener()
@@ -95,7 +94,6 @@ class MonthlySingleLevelInstantaneous(BaseAPI):
                         fd.write(chunk)
                     else:
                         break
-            print(file)
 
             create_filtered_monthly_file(out_file, out_file.replace('.nc', '.tif'))
             os.remove(out_file)

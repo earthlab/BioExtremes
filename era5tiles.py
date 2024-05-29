@@ -61,8 +61,6 @@ _20s = ['2020', '2021', '2022', '2023']
 # get name of each tile (these will tell us the coordinates)
 names = gmw.get_tile_names(gmw_dir)
 
-print(names)
-
 # Copernicus client
 client = cdsapi.Client(quiet=True)
 
