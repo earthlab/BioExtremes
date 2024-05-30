@@ -90,7 +90,7 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     information permanently, so that it can be used to selectively download granules for shot-level subsetting. 
     Note that the loop will take a while to get going because ThreadPoolExecutor.map() unpacks the iterable up front.
     """
-    save_interval = 10
+    save_interval = 1000
     with futures.ThreadPoolExecutor(nproc) as executor:
         partial_func = partial(constraint, existing_urls=new_urls)
         for i, (accept, url) in enumerate(tqdm(executor.map(partial_func, urls))):
