@@ -93,7 +93,7 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     save_interval = 1000
     with futures.ThreadPoolExecutor(nproc) as executor:
         partial_func = partial(constraint, existing_urls=new_urls)
-        for i, (accept, url) in enumerate(tqdm(executor.map(partial_func, urls))):
+        for i, (accept, url) in enumerate(executor.map(partial_func, urls)):
             if accept is not None:
                 accepted.append(accept)
                 new_urls.append(url)
