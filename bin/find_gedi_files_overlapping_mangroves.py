@@ -55,7 +55,7 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     api.check_credentials()
     print('Credentials valid')
 
-    checkpoint = output_file.replace('.csv', '_progress.csv')
+    checkpoint = output_file.replace('.csv', '_checkpoint.csv')
     accepted, new_urls = [], []
     if os.path.exists(checkpoint):
         checkpoint_df = pd.read_csv(checkpoint)
