@@ -36,7 +36,6 @@ def numpy_array_to_raster(array, top_left, hours_from_epoch, output_file):
 
 def create_filtered_monthly_file(input_file: str, output_file: str, variable: str = 'TP'):
     input_raster = nc.Dataset(input_file)
-    print(input_raster[variable].shape)
 
     data = []
     hours_from_epoch = []
@@ -50,7 +49,6 @@ def create_filtered_monthly_file(input_file: str, output_file: str, variable: st
 
 def create_filtered_instantaneous_file(input_file: str, output_file: str, hours: List[int], variable: str = 'I10FG'):
     input_raster = nc.Dataset(input_file)
-    print(input_raster[variable].shape)
 
     epoch_time = datetime(1900, 1, 1)
     hours_from_epoch = []

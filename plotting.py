@@ -1,455 +1,218 @@
-from itertools import combinations, permutations
 import os
-
-import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
 import pandas as pd
 import statsmodels.api as sm
-from scipy import stats
-from scipy.optimize import curve_fit
-
-
-def model_function(x, a, b, c):
-    return a * np.exp(-b * x) + c
-
-
-def all_unique_permutations(vars):
-    # Generate permutations
-    all_permutations = []
-    # Permutations with one item
-    for item in vars:
-        all_permutations.append((item,))
-    # Permutations with two items
-    for perm in permutations(vars, 2):
-        all_permutations.append(perm)
-    # Permutations with three items
-    for perm in permutations(vars, 3):
-        all_permutations.append(perm)
-    # Permutations with four items (all items)
-    all_permutations.append(tuple(vars))
-    # Print all permutations
-
-    b = []
-    for p in [sorted(v) for v in all_permutations]:
-        if p not in b:
-            b.append(p)
-
-    return b
-
-
-#std_err
-
-
-def plot_multivariate(out_dir, linear: bool = False):
-    dependent_vars = ['rh_98', 'pai', 'fhd']
-    l2a_csv = pd.read_csv('l2a_2019.csv')
-    l2b_csv = pd.read_csv('l2b_2019.csv')
-
-    for dep_var in dependent_vars:
-        csv = l2a_csv if dep_var in l2a_csv.columns else l2b_csv
-
-        wind_indep_vars = [
-            'wind_intensity',
-            'wind_duration',
-            'wind_frequency',
-            'wind_time_since_last_event'
-        ]
-        rain_indep_vars = [
-            'rain_frequency',
-            'rain_intensity',
-            'rain_duration',
-            'rain_time_since_last_event'
-        ]
-
-        r2s = []
-        for indep_vars in all_unique_permutations(rain_indep_vars + wind_indep_vars):
-            x_cols = []
-            # idx = np.where(csv['wind_duration' if any(
-            #     indep_var in wind_indep_vars for indep_var in indep_vars) else 'rain_duration'] >= 0)
-            idx = np.where(np.logical_and(csv['wind_duration'] >= 0,  csv['rain_duration'] >= 0))
-            for indep_var in indep_vars:
-                x_cols.append(csv[indep_var].values[idx])
-            x = np.stack(x_cols).T
-            y = csv[dep_var].values[idx]
-
-            X = sm.add_constant(x)
-            #X = x
-
-            quantiles = [
-                0.5, 0.70, 0.80,
-                0.90]
-
-            # fit_functor, plot_functor = (lambda x: x, lambda x: x) if 'time_since_last_event' in indep_var else (np.log, np.exp)
-            fit_functor, plot_functor = (lambda x: x, lambda x: x) if linear else (np.log, np.exp)
-
-            # Fit quantile regression models for each quantile level
-            quantile_results = []
-            for quantile in quantiles:
-                model = sm.QuantReg(fit_functor(y), X)
-                result = model.fit(q=quantile)
-                quantile_results.append(result)
-
-            # Print summary results for each quantile
-            #plt.scatter(x, y, label='Data', alpha=0.50)
-
-            # Plot original data
-            # fig = plt.figure()
-            # ax = fig.add_subplot(111, projection='3d')  # For 3D plotting
-            # print(X[:, 0], X[:, 1])
-            # ax.scatter(X[:, 0], X[:, 1], y, label='Original Data')
-
-            # Plot lines of best fit for each quantile
-            for i, result in enumerate(quantile_results):
-                try:
-                    # Generate predictions
-                    print(dep_var)
-                    print(result.summary())
-                    summary = result.summary().as_text()
-                    r2s.append(result.prsquared)
-                    with open(os.path.join(out_dir, f'{dep_var}_vs_wind_{quantiles[i]}_multivariate.txt'), 'w+') as f:
-                        f.write(summary)
-                    #predictions = result.predict(X)
-
-                    # Plot predictions
-                    # If you have more than 2 independent variables, you may need to adjust how you plot the predictions
-                    # For 3D plotting
-                    # ax.plot_trisurf(X[:, 0], X[:, 1], predictions, linewidth=0.2, antialiased=True, cmap='viridis',
-                    #                 alpha=0.5, label=f'Quantile {quantiles[i]}')
-                    #
-                    # # Add labels and legend
-                    # ax.set_xlabel('Wind Duration')
-                    # ax.set_ylabel('Wind Intensity')
-                    # ax.set_zlabel('PAI')
-                    # plt.legend()
-                    # plt.title('Quantile Regression with Multiple Independent Variables')
-                    # plt.show()
-
-                    # Extract coefficients for the current quantile
-                    # coef = result.params
-                    #
-                    # # Compute predicted values for the current quantile
-                    # pred_values = coef[0] + coef[1] * np.array(xs)
-                    # print(coef[0], coef[1])
-                    #
-                    # # Calculate R-squared value for the current quantile
-                    # r_squared = result.prsquared
-                    #
-                    # x_y = sorted(np.stack([xs, pred_values], axis=1), key=lambda x: x[0])
-                    #
-                    # # Plot line of best fit for the current quantile with label including R-squared
-                    # plt.plot([v[0] for v in x_y], plot_functor(np.array([v[1] for v in x_y])),
-                    #          label=f'Quantile {quantiles[i]} (R^2 = {r_squared:.2f})')
-                    # summary = result.summary().as_text()
-                    #
-                    # with open(os.path.join(sub_dir, f'{dep_var}_{indep_var}_{quantiles[i]}_percentile_summary.txt'),
-                    #           'w+') as f:
-                    #     f.write(summary)
-
-                except:
-                    continue
-
-                # # Add labels and legend
-                # x_labels = {
-                #     'wind_duration': 'Max Extreme Wind Event Duration (Hours)',
-                #     'wind_frequency': 'Frequency of Extreme Wind Events',
-                #     'wind_intensity': 'Max Extreme Wind Event Intensity (m/s)',
-                #     'wind_time_since_last_event': 'Time Since Last Wind Event (Hours)',
-                #     'wind_s': 'Max Extreme Wind Event Composite Score',
-                #     'rain_time_since_last_event': 'Time Since Last Rain Event (Months)',
-                #     'rain_duration': 'Max Extreme Rain Event Duration (Months)',
-                #     'rain_frequency': 'Frequency of Extreme Rain Events',
-                #     'rain_intensity': 'Max Extreme Rain Event Intensity (m)',
-                #     'rain_s': 'Max Extreme Rain Event Composite Score'
-                # }
-                # y_labels = {
-                #     'fhd': 'Foliage Height Diversity',
-                #     'pai': 'Plant Area Index (m^2/m^2)',
-                #     'rh_98': 'Relative Height 98 (m)'
-                # }
-                #
-                # title_x = {
-                #     'wind_duration': 'Extreme Wind',
-                #     'wind_frequency': 'Extreme Wind',
-                #     'wind_intensity': 'Extreme Wind',
-                #     'wind_time_since_last_event': 'Extreme Wind',
-                #     'rain_time_since_last_event': 'Extreme Rain',
-                #     'rain_duration': 'Extreme Rain',
-                #     'rain_frequency': 'Extreme Rain',
-                #     'rain_intensity': 'Extreme Rain',
-                #     'rain_s': 'Extreme Rain'
-                # }
-                #
-                # title_y = {
-                #     'fhd': 'Foliage Height Diversity',
-                #     'pai': 'Plant Area Index',
-                #     'rh_98': 'Relative Height 98'
-                # }
-                #
-                # plt.xlabel(x_labels[indep_var])
-                # plt.ylabel(y_labels[dep_var])
-                # plt.legend()
-                # plt.title(f'{title_y[dep_var]} (2019) vs {title_x[indep_var]} (1979-2018) \n Quantile Regression')
-                # plt.savefig(f'{sub_dir}/{dep_var}_{indep_var}.png')
-                # plt.cla()
-                # plt.clf()
-
-        return r2s
-
-
-
-
-
-
-def plot_all_combinations(out_dir, linear: bool = False):
-    dependent_vars = ['rh_98', 'pai', 'fhd']
-    l2a_csv = pd.read_csv('l2a_2019.csv')
-    l2b_csv = pd.read_csv('l2b_2019.csv')
-
-    for dep_var in dependent_vars:
-        csv = l2a_csv if dep_var in l2a_csv.columns else l2b_csv
-
-        wind_indep_vars = [
-            #'wind_intensity', 'wind_duration', 'wind_frequency', 'wind_time_since_last_event'
-        ]
-        rain_indep_vars = [
-            'rain_frequency', 'rain_intensity', 'rain_duration', 'rain_time_since_last_event'
-        ]
-
-        for indep_var in rain_indep_vars + wind_indep_vars:
-
-            sub_dir = os.path.join(out_dir, f'{dep_var}_vs_{indep_var}')
-            os.makedirs(sub_dir, exist_ok=True)
-
-            idx = np.where(csv['wind_duration' if indep_var in wind_indep_vars else 'rain_duration'] >= 0)
-            x = csv[indep_var].values[idx]
-            y = csv[dep_var].values[idx]
-
-            # xs = []
-            # ys = []
-            # bins = np.linspace(np.min(csv[indep_var].values[idx]), np.max(csv[indep_var].values[idx]), 100)
-            # for i in range(1, len(bins)):
-            #     bidx = np.where(np.logical_and(bins[i - 1] <= csv[indep_var].values[idx], csv[indep_var].values[idx] < bins[i]))
-            #     xs.append(np.mean(csv[indep_var].values[idx][bidx]))
-            #     ys.append(np.std(csv[dep_var].values[idx][bidx]))
-            #
-            # xs = [v for v in xs if not np.isnan(v)]
-            # ys = [v for v in ys if not np.isnan(v)]
-
-            xs = x
-            ys = y
-
-            if indep_var in [
-                'wind_duration', 'wind_time_since_last_event'
-            ]:
-                xs *= 4
-
-            X = sm.add_constant(xs)
-
-            quantiles = [0.5, 0.70, 0.80, 0.90]
-
-            #fit_functor, plot_functor = (lambda x: x, lambda x: x) if 'time_since_last_event' in indep_var else (np.log, np.exp)
-            fit_functor, plot_functor = (lambda x: x, lambda x: x) if linear else (np.log, np.exp)
-
-            # Fit quantile regression models for each quantile level
-            quantile_results = []
-            for quantile in quantiles:
-                model = sm.QuantReg(fit_functor(ys), X)
-                result = model.fit(q=quantile)
-                quantile_results.append(result)
-
-            # Print summary results for each quantile
-            plt.scatter(xs, ys, label='Data', alpha=0.50)
-
-            # Plot lines of best fit for each quantile
-            for i, result in enumerate(quantile_results):
-                try:
-                    # Extract coefficients for the current quantile
-                    coef = result.params
-
-                    # Compute predicted values for the current quantile
-                    pred_values = coef[0] + coef[1] * np.array(xs)
-                    print(coef[0], coef[1])
-
-                    # Calculate R-squared value for the current quantile
-                    r_squared = result.prsquared
-
-                    x_y = sorted(np.stack([xs, pred_values], axis=1), key=lambda x: x[0])
-
-                    # Plot line of best fit for the current quantile with label including R-squared
-                    plt.plot([v[0] for v in x_y], plot_functor(np.array([v[1] for v in x_y])), label=f'Quantile {quantiles[i]} (R^2 = {r_squared:.2f})')
-                    summary = result.summary().as_text()
-
-                    with open(os.path.join(sub_dir, f'{dep_var}_{indep_var}_{quantiles[i]}_percentile_summary.txt'), 'w+') as f:
-                        f.write(summary)
-
-                except:
-                    continue
-
-            # Add labels and legend
-            x_labels = {
-                'wind_duration': 'Max Extreme Wind Event Duration (Hours)',
-                'wind_frequency': 'Frequency of Extreme Wind Events',
-                'wind_intensity': 'Max Extreme Wind Event Intensity (m/s)',
-                'wind_time_since_last_event': 'Time Since Last Wind Event (Hours)',
-                'wind_s': 'Max Extreme Wind Event Composite Score',
-                'rain_time_since_last_event': 'Time Since Last Drought (Months)',
-                'rain_duration': 'Max Drought Duration (Months)',
-                'rain_frequency': 'Frequency of Drought Events',
-                'rain_intensity': 'Max Drought Event Intensity (m)',
-                'rain_s': 'Max Drought Event Composite Score'
-            }
-            y_labels = {
-                'fhd': 'Foliage Height Diversity',
-                'pai': 'Plant Area Index (m^2/m^2)',
-                'rh_98': 'Relative Height 98 (m)'
-            }
-
-            title_x = {
-                'wind_duration': 'Extreme Wind',
-                'wind_frequency': 'Extreme Wind',
-                'wind_intensity': 'Extreme Wind',
-                'wind_time_since_last_event': 'Extreme Wind',
-                'rain_time_since_last_event': 'Extreme Rain',
-                'rain_duration': 'Drought',
-                'rain_frequency': 'Drought',
-                'rain_intensity': 'Drought',
-                'rain_s': 'Drought'
-            }
-
-            title_y = {
-                'fhd': 'Foliage Height Diversity',
-                'pai': 'Plant Area Index',
-                'rh_98': 'Relative Height 98'
-            }
-
-            plt.xlabel(x_labels[indep_var])
-            plt.ylabel(y_labels[dep_var])
-            plt.legend()
-            plt.title(f'{title_y[dep_var]} (2019) vs {title_x[indep_var]} (1979-2018) \n Quantile Regression')
-            plt.savefig(f'{sub_dir}/{dep_var}_{indep_var}.png', dpi=300)
-            plt.cla()
-            plt.clf()
-
-            # slope, intercept, r, p, se = stats.linregress(x, y[idx])
-            # print(dep_var, indep_var, r, p)
-
-        # all_combinations = []
-        # for r in range(1, len(wind_indep_vars + rain_indep_vars) + 1):
-        #     all_combinations.extend(combinations(wind_indep_vars + rain_indep_vars, r))
-
-        # for comb in all_unique_permutations(wind_indep_vars + rain_indep_vars):
-        #     print(comb)
-        #
-        #     wind_idx = None
-        #     if 'wind_duration' in comb:
-        #         wind_idx = 'wind_duration'
-        #     elif 'wind_intensity' in comb:
-        #         wind_idx = 'wind_intensity'
-        #     elif 'wind_frequency' in comb:
-        #         wind_idx = 'wind_frequency'
-        #     elif 'wind_time_since_last_event':
-        #         wind_idx = 'wind_time_since_last_event'
-        #
-        #     wind_col = None
-        #     if wind_idx is not None:
-        #         wind_col = csv[wind_idx].values[percentile]
-        #
-        #     rain_idx = None
-        #     if 'rain_duration' in comb:
-        #         rain_idx = 'rain_duration'
-        #     elif 'rain_intensity' in comb:
-        #         rain_idx = 'rain_intensity'
-        #     elif 'rain_frequency' in comb:
-        #         rain_idx = 'rain_frequency'
-        #     elif 'rain_time_since_last_event':
-        #         rain_idx = 'rain_time_since_last_event'
-        #
-        #     rain_col = None
-        #     if rain_idx is not None:
-        #         rain_col = csv[rain_idx].values[percentile]
-        #
-        #     idx = np.logical_and(wind_col >= duration_cutoff_wind if wind_col is not None else
-        #                          np.ones_like(percentile[0]),
-        #                          rain_col >= duration_cutoff_rain if rain_col is not None else np.ones_like(percentile[0])
-        #                          )
-        #
-        #     x_cols = []
-        #     for indep_var in comb:
-        #         if indep_var not in ['wind_frequency']:
-        #             x_cols.append(np.array([np.log(v) for v in csv[indep_var].values[percentile][idx]]))
-        #         else:
-        #             x_cols.append(csv[indep_var].values[percentile][idx])
-        #
-        #     x = np.stack(x_cols).T
-        #     y_train = csv[dep_var].values[percentile][idx]
-        #
-        #     model = LinearRegression()
-        #     model.fit(x, y_train)
-        #
-        #     y_pred = model.predict(x)
-        #
-        #     residuals = y_train - y_pred
-
-            # Fit the model to the data
-            # try:
-            #     print('popt')
-            #     popt = curve_fit(model_function, x, y_train)
-            #     print(*popt)
-            # except:
-            #     continue
-            # # Calculate predicted values
-            # y_pred = model_function(x, *popt)
-            # #
-            # # # Calculate R-squared value
-            # ss_total = np.sum((y_train - np.mean(y_train)) ** 2)
-            # ss_res = np.sum((y_train - y_pred) ** 2)
-            # r_squared = 1 - (ss_res / ss_total)
-            #
-            # print(comb, "R-squared:", r_squared)
-
-            # # Plot residuals
-            # plt.figure(figsize=(8, 6))
-            # plt.scatter(y_pred, residuals)
-            # plt.xlabel('Predicted Values')
-            # plt.ylabel('Residuals')
-            # plt.title('Residual Plot')
-            # plt.axhline(y=0, color='r', linestyle='--')
-            # plt.grid(True)
-            # plt.savefig(f'residual_plot_{dep_var}.png')
-            #
-            # # Plot predicted vs. actual values
-            # plt.figure(figsize=(8, 6))
-            # plt.scatter(y_train, y_pred)
-            # plt.plot([y_train.min(), y_train.max()], [y_train.min(), y_train.max()], 'k--', lw=2)
-            # plt.xlabel('Actual Values')
-            # plt.ylabel('Predicted Values')
-            # plt.title('Actual vs. Predicted Plot')
-            # plt.grid(True)
-            # plt.savefig(f'predicted_vs_actual_plot_{dep_var}.png')
-
-            # Print regression coefficients
-            #print(f"Regression Coefficients {dep_var}:", model.coef_)
-
-            # Calculate R-squared
-            # r2 = r2_score(y_train, y_pred)
-            # print(r2)
-            # if r2 > max_r2:
-            #     # if max_r2 != 0:
-            #     #     print(comb, r2)
-            #     max_r2 = r2
-            #
-            # # Calculate Mean Squared Error
-            # mse = mean_squared_error(y_train, y_pred)
-
-            # if len(comb) == 8:
-            #     model = sm.OLS(y_train, sm.add_constant(x)).fit()
-            #
-            #     # Get the p-values of the coefficients
-            #     p_values = model.pvalues
-            #
-            #     print(comb, p_values)
-
-            #print(f"Mean Squared Error {dep_var}:", mse)
-    #print(max_r2)
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List
+import seaborn as sns
+
+
+class Plotter:
+    def __init__(self, base_data_dir: str, output_dir: str):
+        self.base_data_dir = base_data_dir
+        self.output_dir = output_dir
+        self.wind_indep_vars = ['wind_intensity', 'wind_duration', 'wind_frequency', 'wind_time_since_last_event']
+        self.rain_indep_vars = ['drought_frequency', 'drought_intensity', 'drought_duration',
+                                'drought_time_since_last_event']
+        self.dep_var_map = {
+            'rh98': 'Relative Height 98th Percentile (m)',
+            'pai': 'Plant Area Index (m^2/m^2)',
+            'fhd': 'Foliage Height Diversity'
+        }
+
+    def plot_all(self, plot_type: str):
+        """Plot all eco regions, species diversity, or separate based on the type."""
+        files_to_plot = self._get_files_to_plot(plot_type)
+        if plot_type == 'eco_regions':
+            print(files_to_plot)
+            self.plot_combined(files_to_plot, 'eco_regions_combined', plot_type)
+        elif plot_type == 'species_richness':
+            files_to_plot = sorted(files_to_plot, key=lambda x: int(os.path.basename(x).split('_')[2]))
+            self.plot_combined(files_to_plot, 'species_richness_combined', plot_type)
+
+    def plot_combined(self, csv_files: List[str], base_name: str, plot_type):
+        dependent_vars = ['rh98', 'pai', 'fhd']
+        for dep_var in dependent_vars:
+            for indep_var in self.rain_indep_vars + self.wind_indep_vars:
+                print(f"Processing: {dep_var} vs {indep_var}")
+                self._plot_csv_files(csv_files, dep_var, indep_var, base_name, plot_type)
+                plt.cla()
+
+    @staticmethod
+    def _range_transform(s):
+        label_name = [w.capitalize() for w in os.path.basename(s).replace('.csv', '').split('_')]
+        if label_name[-1].isdigit() and label_name[-2].isdigit():
+            label_name[-1] = label_name[-2] + '-' + label_name.pop()
+        label_name = ' '.join(label_name)
+        return label_name
+
+    def _get_files_to_plot(self, plot_type):
+        """Get a list of files to plot based on the plot type."""
+        path = self.base_data_dir
+        if plot_type == "species_richness":
+            return [os.path.join(path, file) for file in os.listdir(path) if file.startswith('species_richness')]
+        if plot_type == 'eco_regions':
+            return [os.path.join(path, file) for file in os.listdir(path) if not file.startswith('species_richness')]
+        return [os.path.join(path, file) for file in os.listdir(path) if not file.startswith('.')]
+
+    def _plot_csv_files(self, csv_files, dep_var, indep_var, base_name, plot_type):
+        fig, ax = plt.subplots()
+        labels = []
+        x_values, y_values = [], []
+        all_y_values = []
+        for i, csv_file in enumerate(csv_files):
+            csv = pd.read_csv(csv_file)
+
+            # Determine the index based on the independent variable condition
+            c = csv['wind_duration' if indep_var in self.wind_indep_vars else 'drought_duration']
+            if not any([v > 0 for v in c.values]):
+                continue
+            idx = c >= 0
+            x, y = csv[indep_var].values[idx], csv[dep_var].values[idx]
+
+            l = len(y)
+            m = [not np.isnan(v) for v in y]
+            if dep_var == 'rh98':
+                m = np.logical_and(m, [v <= 68 for v in y])
+            x, y = x[m], y[m]
+
+            x_values.extend(x)
+            y_values.extend(y)
+
+            if plot_type == 'eco_regions':
+                labels.append(' '.join([w.capitalize() for w in os.path.basename(csv_file).replace('.csv', '').split('_')]))
+            else:
+                labels.append(self._range_transform(csv_file))
+            all_y_values.append(y)  # Collect y-values for violin plot
+
+            # Plot for the current CSV
+            self._fit_and_plot_combined(x, y, csv_file, i, ax)
+
+        # Calculate mean and standard deviation for y-values
+
+        x_min, x_max = ax.get_xlim()
+        y_min, y_max = ax.get_ylim()
+        ax.scatter(x_values, y_values, color='gray', alpha=0.10, zorder=1)
+
+        if indep_var == 'wind_frequency':
+            ax.set_xlim(-0.01, 0.6)
+        else:
+            ax.set_xlim(x_min, x_max)
+        ax.set_ylim(max(0, y_min), y_max)
+        # Add labels, legend, and save the plot
+        self._add_plot_labels(dep_var, indep_var, ax)
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))  # Adjust ncol as needed for columns
+        fig.savefig(os.path.join(self.output_dir, f'{base_name}_{dep_var}_{indep_var}.png'), dpi=300,
+                    bbox_inches='tight')
+        plt.close(fig)
+
+        fig_violin, ax_violin = plt.subplots()
+        sns.violinplot(data=all_y_values, ax=ax_violin)
+
+        # Set x-ticks and labels
+        ax_violin.set_xticks(range(len(labels)))
+        ax_violin.set_xticklabels(labels, rotation=45, ha='right')
+
+        # Titles and labels
+        if plot_type == 'eco_regions':
+            ax_violin.set_title(f'Violin Plot for {dep_var.upper()} across Marine Region')
+            x_label = 'Marine Region'
+        elif plot_type == 'species_richness':
+            ax_violin.set_title(f'Violin Plot for {dep_var.upper()} across Species Richness')
+            x_label = 'Species Richness'
+        ax_violin.set_xlabel(x_label)
+        ax_violin.set_ylabel(self.dep_var_map[dep_var])
+
+        # Save the violin plot
+        fig_violin.savefig(os.path.join(self.output_dir, f'{base_name}_{dep_var}_violin.png'), dpi=300,
+                           bbox_inches='tight')
+        plt.close(fig_violin)
+
+        # Assuming `all_y_values` is a list of lists or DataFrame and `labels` is a list of strings
+        summary_stats = []
+
+        # Compute statistics for each dataset in `all_y_values`
+        for i, data in enumerate(all_y_values):
+            q1 = pd.Series(data).quantile(0.25)
+            median = pd.Series(data).median()
+            q3 = pd.Series(data).quantile(0.75)
+            summary_stats.append([labels[i], round(q1, 2), round(median, 2), round(q3, 2), len(data)])
+
+        # Create DataFrame for the table
+        unit = None
+        if dep_var == 'rh98':
+            figsize = 9
+            unit = '(m)'
+        elif dep_var == 'fhd':
+            figsize = 9
+            unit = ''
+        else:
+            figsize = 9
+            unit = '(m^2/m^2)'
+
+        summary_df = pd.DataFrame(summary_stats, columns=[x_label, f"25th Percentile {unit}", f"Median {unit}",
+                                                          f"75th Percentile {unit}", "n"])
+
+        # Plot the table using matplotlib
+        fig, ax = plt.subplots(
+            figsize=(figsize, len(labels) * 0.5)
+        )  # Adjust figure size for better readability
+        ax.axis('tight')
+        ax.axis('off')
+
+        # Create the table
+        table = ax.table(
+            cellText=summary_df.values,
+            colLabels=summary_df.columns,
+            cellLoc='center',
+            loc='center'
+        )
+
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1.5, 1.5)
+
+        # Save the table as a figure
+        plt.title(f"Summary Statistics Table of {dep_var.upper()} per {x_label}")
+        plt.savefig(os.path.join(self.output_dir, f"{base_name}_{dep_var}_summary_statistics_table.png"),
+                    bbox_inches='tight', dpi=300)
+        plt.close(fig)
+
+    def _fit_and_plot_combined(self, x, y, csv_file, i, ax):
+        colors = plt.colormaps['Set1'].colors
+        colors = list(colors)
+        colors[8] = 'black'
+        X = sm.add_constant(x)
+        quantile_results = sm.QuantReg(y, X).fit(q=0.5, max_iter=20000)
+        coef = quantile_results.params
+        if len(coef) > 1 and 0 < abs(coef[1]) < 3500:
+            pred_values = coef[0] + coef[1] * np.array(x)
+            sorted_vals = sorted(zip(x, pred_values), key=lambda v: v[0])
+
+            ax.plot([v[0] for v in sorted_vals], [v[1] for v in sorted_vals],
+                    zorder=2,
+                    linewidth=2,
+                    color=colors[i % len(colors)],
+                    label=self._range_transform(csv_file) + " | " + (f"Slope = {coef[1]:.3f}")
+                    )
+            return ax.get_xlim, ax.get_ylim
+
+    def _add_plot_labels(self, dep_var, indep_var, ax, title_addendum: str = None):
+        indep_var_map = {
+            'wind_intensity': 'Extreme Wind Intensity (m/s)',
+            'wind_duration': 'Extreme Wind Duration (h)',
+            'wind_time_since_last_event': 'Time Since Last Extreme Wind Event (years)',
+            'wind_frequency': 'Extreme Wind Frequency (events / year)',
+            'drought_intensity': 'Drought Intensity (m)',
+            'drought_frequency': 'Drought Frequency (events / year)',
+            'drought_duration': 'Drought Duration (months)',
+            'drought_time_since_last_event': 'Time Since Last Drought Event (years)'
+        }
+        title = f"{dep_var.replace('_', ' ').upper()} vs {' '.join([w.capitalize() for w in indep_var.split('_')])} 1979-Present"
+        if title_addendum:
+            title += '\n' + title_addendum
+        ax.set_title(title)
+        ax.set_xlabel(indep_var_map[indep_var])
+        ax.set_ylabel(self.dep_var_map[dep_var])
+        ax.legend()

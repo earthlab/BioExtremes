@@ -149,7 +149,7 @@ class HourlySingleLevelInstantaneous(BaseAPI):
 
         for file in file_links:
             out_file = os.path.join(out_dir, os.path.basename(file))
-            if os.path.exists(out_file):
+            if os.path.exists(out_file) or os.path.exists(out_file.replace('.nc', '.tif')):
                 continue
             myrequest = urllib.request.Request(file)
             response = urllib.request.urlopen(myrequest)

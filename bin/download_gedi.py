@@ -5,26 +5,32 @@ from argparse import ArgumentParser
 from enums import GEDILevel
 from gmw import gmw
 from gedi.api import L2A, L2B
+from gedi.files import group_csv_by_year
 from gedi.shotconstraint import Buffer
 from gedi.download import download_and_filter_urls
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
+DATA_DIR = os.path.join(PROJECT_DIR, 'data')
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--file_level', type=str, help='Product level to download (L2A, L2B, L1B)',
                         required=True)
-    parser.add_argument('--overlapping_file_csv', type=str,
+    parser.add_argument('--gedi_overlaps_csv', type=str,
                         help='Path to csv file containing overlapping GEDI granules')
     parser.add_argument('--gmw_dir', type=str,
+                        default=os.path.join(DATA_DIR, 'gmw_v3_2020'),
                         help='Path to directory containing overlapping mangrove tif files')
-    parser.add_argument('--out_dir', type=str, help='Directory to write the output files to')
+    parser.add_argument('--output_dir', type=str, help='Directory to write the output files to')
     args = parser.parse_args()
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    if args.output_dir is None:
+        args.output_dir = os.path.join(DATA_DIR, 'gedi', args.file_level)
 
-    overlapping_file_csv = args.overlapping_file_csv
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    overlapping_file_csv = args.gedi_overlaps_csv
     gmw_dir = args.gmw_dir
 
     file_level = GEDILevel[args.file_level]
@@ -61,10 +67,12 @@ if __name__ == "__main__":
     download_and_filter_urls(
         urls,
         api=api,
-        beam_names=['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],     # full power beams
+        beam_names=['BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011'],  # full power beams
         keep_obj=keep_obj,
         shot_constraint=buffer,
         keep_every=1,
         nproc=4,
-        out_dir=args.out_dir
+        out_dir=args.output_dir
     )
+
+    group_csv_by_year(args.output_dir, os.path.join(DATA_DIR, 'gedi'), args.file_level)

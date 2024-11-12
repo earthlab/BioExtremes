@@ -2,21 +2,20 @@
 import os
 from functools import partial
 from argparse import ArgumentParser
-from datetime import date, datetime
+from datetime import datetime
 from concurrent import futures
 import warnings
-
-from tqdm import tqdm
 
 from gmw import gmw
 import pandas as pd
 from enums import GEDILevel
-from gedi.api import L2A, L2B, L1B
+from gedi.api import L2A, L2B
 from gedi.granuleconstraint import RegionGC, CompositeGC
 
 
 warnings.filterwarnings("ignore")
 PROJECT_DIR = os.path.dirname(os.path.dirname(__file__))
+DATA_DIR = os.path.join(PROJECT_DIR, 'data')
 nproc = os.cpu_count()
 
 
@@ -59,7 +58,6 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
     accepted, new_urls = [], []
     if os.path.exists(checkpoint):
         checkpoint_df = pd.read_csv(checkpoint)
-        existing_urls = list(checkpoint_df['url'])
         accepted += list(checkpoint_df['accepted'])
         new_urls += list(checkpoint_df['url'])
 
@@ -101,8 +99,8 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
                 # Save progress at intervals
                 print(i % save_interval == 0)
                 if i > 0 and i % save_interval == 0:
-                    print('saving')
-                    save_progress(accepted, new_urls, output_file.replace('.csv', f'_checkpoint.csv'))
+                    print(f'saving progress to {checkpoint}')
+                    save_progress(accepted, new_urls, checkpoint)
 
     if accepted and new_urls:
         save_progress(accepted,  new_urls, output_file)
@@ -110,15 +108,19 @@ def find_overlap(file_level: GEDILevel, start_date: datetime, end_date: datetime
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--file_level', type=str, help='Product level to download (L2A, L2B, L1B)',
-                        required=True)
-    parser.add_argument('--gmw_dir', type=str, required=True, help='Path to mangrove location files')
-    parser.add_argument('--out_file', type=str, required=True, help='Path to output csv file')
+    parser.add_argument('--file_level', type=str, help='Product level to download (L2A, L2B)',
+                        required=True, choices=['L2A', 'L2B'])
+    parser.add_argument('--gmw_dir', type=str, help='Path to mangrove location files',
+                        default=os.path.join(DATA_DIR, 'gmw_v3_2020'))
+    parser.add_argument('--output_file', type=str, help='Path to output csv file')
     parser.add_argument('--start_date', type=str, help='Start date of overlap search in YYYY-MM-DD',
                         required=False)
     parser.add_argument('--end_date', type=str, help='End date of overlap search in YYYY-MM-DD',
                         required=False)
     args = parser.parse_args()
+
+    if args.output_file is None:
+        args.output_file = os.path.join(DATA_DIR, 'gedi', f'{args.file_level}_overlapping_gedi_files.csv')
 
     find_overlap(
         GEDILevel[args.file_level],
@@ -127,5 +129,5 @@ if __name__ == "__main__":
         datetime.today() if args.end_date is None else datetime.strptime(
             args.end_date, '%Y-%m-%d'),
         args.gmw_dir,
-        args.out_file
+        args.output_file
     )

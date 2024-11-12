@@ -131,7 +131,7 @@ def download_and_filter_urls(
     """
     urls = sorted(urls)
     args_list = [(link, api, beam_names, keep_obj, keep_every, shot_constraint, out_dir) for link in urls if not
-    os.path.exists(os.path.join(out_dir, os.path.basename(link)))]
+        os.path.exists(os.path.join(out_dir, os.path.basename(link)))]
     if progess_bar:
         print(f"Filtering {nproc} files at a time; progress so far:")
     with futures.ThreadPoolExecutor(nproc) as executor:
