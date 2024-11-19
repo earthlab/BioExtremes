@@ -12,12 +12,15 @@ homogenization worldwide, and 2. Assess the role of species diversity in ecosyst
 
 ### Prerequisites
 
-Ensure you have the following installed:
+Ensure you have the following:
 	•	Python 3.8+
 	•	Required Python packages (install via requirements.txt):
     ```bash
     pip install -r requirements.txt
     ```
+	•	NASA EarthData account for GEDI data download. If you do not have an account you can register at
+	    https://urs.earthdata.nasa.gov/users/new. 
+	•	NASA EarthData credentials set as BEX_USER and BEX_PWD environment variables
 
 ### Suggested Workflow
 
