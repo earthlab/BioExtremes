@@ -14,8 +14,9 @@ The Bioextreme open-source tool has the following features:
 - Granule-level filter tool: can be used to determine the URLs of granules intersecting a polygon, bounding box, or a union or intersection of such shapes - mangrovegranules.py  
 - Shot-level filter tool: can be used to discard irrelevant or low-quality data according to the user’s specifications from within a granule after it is downloaded - mangroveshots.py 
 
-## 2. Downloading ERA-5 data and comparison with International Best Track Archive (IBTrACS) wind speeds
+## 2. Downloading ERA-5 data and comparison with IBTrACS wind speeds
 
-- Download ERA-5 instantaneous 10m wind speed: can be used to download 
+- Download ERA-5 instantaneous 10m wind speed: can be used to download ERA5 measurements of the 10m instantaneous wind speed and total precipitation from each 1x1 degree tile in an AOI - era5tiles.py
 - IBTrACS and ERA5 maximum wind speeds comparison: can be used to calculate cyclone-force winds from the ERA5 instantaneous 10m wind speed - windspeedcomparison.py
 
+## 3. Thres
