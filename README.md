@@ -7,7 +7,7 @@ The main objective of this project is to develop an open-source tool that facili
 
 ![image](https://github.com/earthlab/BioExtremes/assets/67020853/773b417a-e15d-454a-b20a-948994084da9)
 
-The Bioextreme open-source tool has the following features:
+The *Bioextremes open-source tool* has the following features:
 
 ## 1. Subsetting and Downloading GEDI Data
 
