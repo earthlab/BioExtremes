@@ -19,4 +19,4 @@ The **Bioextremes open-source tool** comprises the following features:
 - Download ERA-5 instantaneous 10m wind speed: can be used to download ERA5 measurements of the 10m instantaneous wind speed and total precipitation from each 1x1 degree tile in an AOI - era5tiles.py
 - IBTrACS and ERA5 maximum wind speeds comparison: can be used to calculate cyclone-force winds from the ERA5 instantaneous 10m wind speed - windspeedcomparison.py
 
-## 3. Thres
+## 3. Calculating extreme weather event metrics 
