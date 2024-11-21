@@ -1,3 +1,5 @@
+FROM continuumio/miniconda3
+
 # Set the working directory in the container
 WORKDIR /app
 
@@ -21,9 +23,7 @@ RUN rm -rf .git
 # Make your CLI scripts executable
 RUN chmod +x /app/bin/*.py
 
-# Optionally, add your scripts to the PATH
-ENV PATH="/app/bin:${PATH}"
-ENV PYTHONPATH=$(pwd)
+ENV PYTHONPATH="/app"
 
 # Set the default command to start an interactive shell
 CMD ["/bin/bash"]
