@@ -1,6 +1,6 @@
 """
-This module contains implements APIs to access GEDI L1B, L2B, and L2A data. Note that the only way to access the
-contents of a GEDI archive file is through the process_in_memory_file() method of the base GEDI class. This is to
+This module contains implements APIs to access gedi L1B, L2B, and L2A data. Note that the only way to access the
+contents of a gedi archive file is through the process_in_memory_file() method of the base gedi class. This is to
 discourage writing unprocessed files to disk, since the raw data is large and mostly not useful.
 """
 
@@ -17,6 +17,8 @@ import re
 from datetime import datetime, timedelta, date
 import urllib
 from bs4 import BeautifulSoup
+import time
+from tqdm import tqdm
 
 
 class GEDIAPI:
@@ -30,7 +32,9 @@ class GEDIAPI:
         """
         Initializes the common attributes required for each data type's API
         """
-        self._username = os.environ['BEX_USER']     # TODO: raise a proper exception if these aren't defined
+        if 'BEX_USER' not in os.environ or 'BEX_PWD' not in os.environ:
+            raise ValueError('Please set your earthdata credentials as BEX_USER and BEX_PWD env variables.')
+        self._username = os.environ['BEX_USER']
         self._password = os.environ['BEX_PWD']
         self._core_count = os.cpu_count()
         self._file_re = None
@@ -51,6 +55,7 @@ class GEDIAPI:
                 "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml",
                 lambda _: True
             )
+
         except HTTPError as e:
             print('An HTTPError occurred, suggesting that your authentication may have failed. \
                     Are your credentials correct?')
@@ -149,7 +154,7 @@ class GEDIAPI:
         return sorted(list(set([datetime.strptime(link, '%Y.%m.%d/') for link in links if re.match(date_re, link) is not
                                 None])))
 
-    def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> Iterator[str]:
+    def urls_in_date_range(self, t_start: date, t_end: date, suffix: str = "") -> List[str]:
         """
         Yields the url of every file from a granule from between start and end dates (inclusive). Higher than daily
         (e.g., hourly) precision for start/end times is not available.
@@ -159,15 +164,15 @@ class GEDIAPI:
         :param suffix: Only yield urls ending in this string.
         """
         delta = t_end - t_start
+        urls = []
         for nd in range(delta.days + 1):
             day = t_start + timedelta(days=nd)
-            # TODO: code duplication from download_time_series()
             dayurl = urllib.parse.urljoin(self._BASE_URL, day.strftime('%Y') + '.' + day.strftime('%m') + '.' +
                                           day.strftime('%d') + '/')
             yield from (dayurl + file for file in self.retrieve_links(dayurl, suffix))
 
 
-class L2AAPI(GEDIAPI):
+class L2A(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/'
 
     def __init__(self, lazy: bool = False):
@@ -176,7 +181,7 @@ class L2AAPI(GEDIAPI):
         self._dates = self._retrieve_dates(self._BASE_URL)
 
 
-class L2BAPI(GEDIAPI):
+class L2B(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_B.002/'
 
     def __init__(self, lazy: bool = False):
@@ -185,7 +190,7 @@ class L2BAPI(GEDIAPI):
         self._dates = self._retrieve_dates(self._BASE_URL)
 
 
-class L1BAPI(GEDIAPI):
+class L1B(GEDIAPI):
     _BASE_URL = 'https://e4ftl01.cr.usgs.gov/GEDI/GEDI01_B.002/'
 
     def __init__(self, lazy: bool = False):

@@ -18,12 +18,12 @@ from Spherical.functions import addtolon
 mps2kts = 1.94384   # unit conversion ratio
 
 # where to save the data from each storm
-savepath = "/Users/fcseidl/EarthLab-local/BioExtremes/WindComparisonBasins.csv"
+savepath = "WindComparisonBasins.csv"
 
 np.random.seed(0)
 
 # IBTrACS data where max wind and basin are recorded
-ibt = pd.read_csv('/Users/fcseidl/Downloads/ibtracs.since1980.list.v04r00.csv')
+ibt = pd.read_csv('ibtracs.since1980.list.v04r00.csv')
 ibt = ibt[1:]
 ibt = ibt[ibt['WMO_WIND'] != ' ']
 ibt = ibt[(ibt['BASIN'] == 'NA') | (ibt['BASIN'] == 'EP') | (ibt['BASIN'] == 'WP') | (ibt['BASIN'] == 'NI') |
