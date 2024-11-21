@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 ### Suggested Workflow
 
-1. Identify Overlapping GEDI Files
+#### 1. Identify Overlapping GEDI Files
 
 The first step in your analysis should be to identify GEDI files that overlap with mangrove areas. This is done using find_gedi_files_that_overlap_mangroves.py.
 
@@ -44,7 +44,7 @@ Note: You should run this command for both L2A and L2B file levels separately if
 python bin/find_gedi_files_that_overlap_mangroves.py --file_level L2B --start_date 2019-01-01 --end_date 2022-12-31
 ```
 
-2. Download overlapping GEDI files
+#### 2. Download overlapping GEDI files
 
 Next, use these csv files to download the overlapping GEDI files with bin/download_gedi.py
 Example Command:
@@ -56,7 +56,7 @@ This command will:
 -	Download each file in the overlaps csv to the default location data/gedi/L2A
 -   Combine each file by year to the default location data/gedi/gedi_L2A_(year)_combined.csv
 
-3. Download era5 climate data
+#### 3. Download era5 climate data
 
 Use bin/download_era5.py to download the monthly era5 reanalysis precipitation data.
 Example Command:
@@ -82,7 +82,7 @@ This command will:
 -	Write each tif file to the default storage location data/era5/i10fg
 
 
-4. Calculate extreme weather thresholds at each mangrove location
+#### 4. Calculate extreme weather thresholds at each mangrove location
 For each mangrove location we can both calculate a drought threshold and assign an extreme wind value. These values can 
 then be written to a tif file. 
 
@@ -106,7 +106,7 @@ This command will:
 -	Write a tif file containing the extreme wind threshold of 33 m/s at each mangrove location to data/extreme_wind_thresholds.tif
 
 
-5. Calculate extreme weather events at each mangrove location
+#### 5. Calculate extreme weather events at each mangrove location
 Use the drought and extreme wind thresholds to calculate the intensity, duration, frequency, and time since last extreme event
 
 Example Drought Command:
@@ -129,7 +129,7 @@ from the beginning of the era5 record to 2018-12-31
 -	Calculate the intensity, duration, frequency, and time since (I,D,F,T) the most intense wind event at each mangrove location
 -	Write a tif file with the I, D, F, T at each mangrove location to the default location data/extreme_wind_2019.tif 
 
-6. Match extreme weather events with GEDI data
+#### 6. Match extreme weather events with GEDI data
 Use the  combined GEDI csv and extreme weather tif files to match GEDI points to the extreme weather events at each 
 mangrove location. When several GEDI points fall within a single mangrove location the median of the values is taken.
 
@@ -142,7 +142,7 @@ This command will:
 -	Split the dataframe by marine region and species richness range 
 -	Write each resulting dataframe to a csv file at data/gedi_era5_combined/2019/
 
-7. a) (Optional) Combine gedi+era5 yearly dataframes
+#### 7. a) (Optional) Combine gedi+era5 yearly dataframes
 You may want to combine data from several years into one csv before plotting the data
 Example dataframe combine command:
 ```bash
@@ -152,7 +152,7 @@ This command will:
 -	Combine each csv file in data/gedi_era5_combined/2019 with its corresponding csv file in data/gedi_era5_combined/2020
 -	Write each combined csv file to data/gedi_era5_combined/2019_2020_combined
 
-7. b) Plot the regressions and create tables for the combined gedi and extreme event data
+#### 7. b) Plot the regressions and create tables for the combined gedi and extreme event data
 Use the rows in each gedi + extreme event data csv to calculate the linear regression between each gedi (dependent) and
 extreme event type (independent) variable. Plots are created with titles and axis labels. Plots will be created that display 
 the eco regions and their regressions in one place as well as the species richness. Violin plots of the gedi data will also be created.
