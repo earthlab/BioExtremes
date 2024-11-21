@@ -42,20 +42,19 @@ class Combine:
         self.df = self._combine(gedi_columns)
 
     def _era5_index_to_traditional_deg(self, lat_idx, lon_idx):
-        lat, lon = ((self._wind_extreme_events_geo_transform[5] * lat_idx) + self._wind_extreme_events_geo_transform[3],
-                    (self._wind_extreme_events_geo_transform[1] * lon_idx) + self._wind_extreme_events_geo_transform[0])
-        lon -= 180
+        lat, lon = ((self._rain_extreme_events_geo_transform[5] * lat_idx) + self._rain_extreme_events_geo_transform[3],
+                    (self._rain_extreme_events_geo_transform[1] * lon_idx) + self._rain_extreme_events_geo_transform[0])
         return lat, lon
 
     def _traditional_deg_to_era5_index(self, gedi_lat, gedi_lon):
         """
-        GEDI longitudes are in [-180, 180] while era5 rasters are in [0, 360]
+        GEDI longitudes are in [-180, 180]
         """
         lon_idx = int(
-            (gedi_lon + 180) / self._wind_extreme_events_geo_transform[1])
+            (gedi_lon + 180) / self._rain_extreme_events_geo_transform[1])
         lat_idx = int(
-            (gedi_lat - self._wind_extreme_events_geo_transform[3]) /
-            self._wind_extreme_events_geo_transform[5])
+            (gedi_lat - self._rain_extreme_events_geo_transform[3]) /
+            self._rain_extreme_events_geo_transform[5])
         return lat_idx, lon_idx
 
     def _era5_index_to_crenvu_index(self, era5_lat_idx, era5_lon_idx):
@@ -156,42 +155,3 @@ class Combine:
                                                          self.df['mangrove_species_count'] <= species_range[1])]
             species_richness_df.to_csv(
                 os.path.join(out_dir, f'species_richness_{species_range[0]}_{species_range[1]}.csv'))
-
-
-def combine_csv_files(year_dirs, combined_dir):
-    # Create output directories if they don't exist
-    file_dict = {}
-    # Iterate over each year directory
-    for year_dir in year_dirs:
-        if os.path.exists(year_dir):
-            # List all CSV files in the current subdirectory
-            for file in os.listdir(year_dir):
-                if file.endswith('.csv'):
-                    if file not in file_dict:
-                        file_dict[file] = []
-                    # Append the current file path to the dictionary
-                    file_dict[file].append(os.path.join(year_dir, file))
-
-    # Combine and save files with the same name
-    for file in file_dict:
-        paths = file_dict[file]
-        combined_df = pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
-        combined_df.to_csv(os.path.join(combined_dir, file), index=False)
-
-
-def combine_all_years():
-    # for year in ['2019', '2020', '2021', '2022']:
-    #     c = Combine(os.path.join('data', f'extreme_drought_{year}.tif'),
-    #                 os.path.join('data', 'extreme_wind_{year}.tif'),
-    #                 [os.path.join('data', f'l2a_{year}.csv'),
-    #                  os.path.join('data', f'l2b_{year}.csv')])
-    #
-    #     c.split_by_eco_region(os.path.join('data', 'gedi_era5_combined', year))
-    #     c.split_by_species_richness(os.path.join('data', 'gedi_era5_combined', year))
-
-    # Example usage
-    year_dirs = ['data/gedi_era5_combined/2019', 'data/gedi_era5_combined/2020',
-                 'data/gedi_era5_combined/2021', 'data/gedi_era5_combined/2022']
-    combined_dir = 'data/gedi_era5_combined/combined'
-
-    combine_csv_files(year_dirs, combined_dir)

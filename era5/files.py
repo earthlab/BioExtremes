@@ -10,10 +10,17 @@ from rasterio.warp import reproject, Resampling
 
 
 def numpy_array_to_raster(array, top_left, hours_from_epoch, output_file):
-    # Example spatial information
-    crs = 'EPSG:4326'  # Example CRS (WGS84)
-    transform = from_origin(top_left[0], top_left[1], 0.25, 0.25)
-    extent = (0, array.shape[1], array.shape[2], 0)  # Example extent (xmin, xmax, ymin, ymax)
+    """
+    Era5 raster longitudes are in [0, 360]. We need to wrap them to [-180, 180] to be compatible with the
+    rest of the data used.
+    :param array:
+    :param top_left:
+    :param hours_from_epoch:
+    :param output_file:
+    :return:
+    """
+    crs = 'EPSG:4326'
+    transform = from_origin(top_left[0] - 180, top_left[1], 0.25, 0.25)
 
     # Example metadata
     profile = {
@@ -29,7 +36,13 @@ def numpy_array_to_raster(array, top_left, hours_from_epoch, output_file):
     # Create GeoTIFF file
     with rasterio.open(output_file, 'w', **profile) as dst:
         for i in range(array.shape[0]):
-            dst.write(array[i], indexes=i + 1)
+            a = array[i]
+            _, cols = a.shape
+            mid = cols // 2
+
+            a = np.hstack([a[:, mid:], a[:, :mid]])
+
+            dst.write(a, indexes=i + 1)
             dst.update_tags(i + 1, EPOCH='1900-1-1')
             dst.update_tags(i + 1, HOURS_FROM_EPOCH=str(hours_from_epoch[i]))
 
@@ -42,7 +55,7 @@ def create_filtered_monthly_file(input_file: str, output_file: str, variable: st
     for i, initial_time in enumerate(input_raster['time'][:]):
         hours_from_epoch.append(initial_time)
         data.append(input_raster[variable][i, :, :])
-
+    print('A')
     numpy_array_to_raster(np.array(data), (input_raster['longitude'][0], input_raster['latitude'][0]),
                           hours_from_epoch, output_file)
 

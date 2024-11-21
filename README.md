@@ -135,11 +135,33 @@ mangrove location. When several GEDI points fall within a single mangrove locati
 
 Example GEDI / era5 matching command:
 ```bash
-python bin/combine_gedi_and_extreme_events.py --mode L2A --drought_path data/drought_2019.tif --wind_path data/extreme_wind_2019.tif --gedi_csv data/gedi/gedi_l2a_2019_combined.csv --output_dir data/gedi_era5_combined/2019/L2A 
+python bin/combine_gedi_and_extreme_events.py --drought_path data/drought_2019.tif --wind_path data/extreme_wind_2019.tif --gedi_csvs data/gedi/gedi_l2a_2019_combined.csv data/gedi/gedi_l2b_2019_combined.csv --output_dir data/gedi_era5_combined/2019 
 ```
 This command will:
-    •	Match each era5 extreme weather point to the median of any matching GEDI points and add them as a row in a dataframe
+    •	Match each era5 extreme weather point to the median of any matching L2A and L2B GEDI points and add them as a row in a dataframe
 	•	Split the dataframe by marine region and species richness range 
-	•	Write each resulting dataframe to a csv file at data/gedi_era5_combined/2019/L2A
+	•	Write each resulting dataframe to a csv file at data/gedi_era5_combined/2019/
 
+7. a) (Optional) Combine gedi+era5 yearly dataframes
+You may want to combine data from several years into one csv before plotting the data
+Example dataframe combine command:
+```bash
+python bin/combine_gedi_extreme_events_dataframes.py --year_dirs data/gedi_era5_combined/2019 data/gedi_era5_combined/2020 --output_dir data/gedi_era5_combined/2019_2020_combined 
+```
+This command will:
+	•	Combine each csv file in data/gedi_era5_combined/2019 with its corresponding csv file in data/gedi_era5_combined/2020
+	•	Write each combined csv file to data/gedi_era5_combined/2019_2020_combined
 
+7. b) Plot the regressions and create tables for the combined gedi and extreme event data
+Use the rows in each gedi + extreme event data csv to calculate the linear regression between each gedi (dependent) and
+extreme event type (independent) variable. Plots are created with titles and axis labels. Plots will be created that display 
+the eco regions and their regressions in one place as well as the species richness. Violin plots of the gedi data will also be created.
+Example plotting command:
+```bash
+python bin/plot_gedi_extreme_events.py --input_dir data/gedi_era5_combined/2019_2020_combined --output_dir data/regressions
+```
+This command will:
+	•	Calculate the regressions for each marine region, gedi, and extreme event combination and combine the marine regions on one plot. Saves the plot to data/regressions
+    •	Calculate the regressions for each species richness class, gedi, and extreme event combination and combine the species richness classes on one plot. Saves the plot to data/regressions
+	•   Calculate the regressions for each gedi, and extreme event combination for all data points globally. Saves the plot to data/regressions
+    •   Create violin plots and tables for each gedi data set and writes them to data/regressions

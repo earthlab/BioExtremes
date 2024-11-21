@@ -32,7 +32,9 @@ class GEDIAPI:
         """
         Initializes the common attributes required for each data type's API
         """
-        self._username = os.environ['BEX_USER']     # TODO: raise a proper exception if these aren't defined
+        if 'BEX_USER' not in os.environ or 'BEX_PWD' not in os.environ:
+            raise ValueError('Please set your earthdata credentials as BEX_USER and BEX_PWD env variables.')
+        self._username = os.environ['BEX_USER']
         self._password = os.environ['BEX_PWD']
         self._core_count = os.cpu_count()
         self._file_re = None
@@ -53,6 +55,7 @@ class GEDIAPI:
                 "https://e4ftl01.cr.usgs.gov/GEDI/GEDI02_A.002/2020.05.25/GEDI02_A_2020146010156_O08211_03_T02527_02_003_01_V002.h5.xml",
                 lambda _: True
             )
+
         except HTTPError as e:
             print('An HTTPError occurred, suggesting that your authentication may have failed. \
                     Are your credentials correct?')

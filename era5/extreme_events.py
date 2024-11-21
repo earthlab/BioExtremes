@@ -132,10 +132,8 @@ class Drought(Base):
                 t = m.end()
 
         # report time since last event, frequency, and maximum intensity / duration
-        f = len(matches) / values.shape[0]
+        f = (len(matches) / values.shape[0]) * 12  # Make frequency events / year
 
-        # Each time step is one month, and we want duration and time since last event in years
-        d /= 12
         t = (values.shape[0] - t) / 12
 
         # Each time step is one month, and we want frequency in events / year
@@ -177,13 +175,5 @@ class Wind(Base):
 
         return i, d, f, t
 
-    @staticmethod
-    def _convert_era5_wind_speed_to_ibtracs(era5_speed: float) -> float:
-        mps2kts = 1.94384
-        m, b = 0.826599091061478, 13.383383250900929
-
-        return ((era5_speed * mps2kts * m) + b) / mps2kts
-
     def create_idf_tif(self, in_dir: str, start_date: datetime, end_date: datetime, window: int, outfile: str):
-        super().create_idf_tif(in_dir, start_date, end_date, window, outfile, threshold_functor=lambda x, y: x > y,
-                               transform=self._convert_era5_wind_speed_to_ibtracs)
+        super().create_idf_tif(in_dir, start_date, end_date, window, outfile, threshold_functor=lambda x, y: x > y)

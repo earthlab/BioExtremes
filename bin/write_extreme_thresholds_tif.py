@@ -22,7 +22,7 @@ def wind_parser(subparser):
     wind.add_argument('--gmw_dir', type=str, default=os.path.join(DATA_DIR, 'gmw_v3_2020'), help='Path to GMW directory')
     wind.add_argument('--era5_dir', type=str, required=True, help='Path to ERA5 directory')
     wind.add_argument('--output_file', type=str, required=True, help='Output file path')
-    wind.add_argument('--threshold', type=int, default=33, help='Threshold for wind computation')
+    wind.add_argument('--threshold', type=float, default=33, help='Threshold for wind computation')
     return wind
 
 
@@ -44,6 +44,7 @@ if __name__ == '__main__':
         if args.output_file is None:
             args.output_file = os.path.join(DATA_DIR, 'extreme_wind_thresholds.tif')
         t = Wind(args.gmw_dir)
-        t.write_threshold_file(args.era5_dir, args.output_file)
+        print(args.threshold)
+        t.write_threshold_file(args.era5_dir, args.output_file, args.threshold)
     else:
         parser.print_help()

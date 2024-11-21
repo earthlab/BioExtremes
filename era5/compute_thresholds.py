@@ -45,7 +45,7 @@ class ComputeThresholds:
 
 
 class Drought(ComputeThresholds):
-    def __init__(self, gmw_dir: str, percentile: int = 95):
+    def __init__(self, gmw_dir: str, percentile: int = 5):
         super().__init__(gmw_dir)
         self._percentile = percentile
         self._threshold_date_start = datetime(1979, 1, 1)
@@ -74,6 +74,7 @@ class Drought(ComputeThresholds):
             try:
                 raster = gdal.Open(os.path.join(era5_dir, file))
                 a = raster.ReadAsArray()
+
                 a = a.reshape(a.shape[0], -1)
             except AttributeError as e:
                 print(f'Raster error with {file}, skipping')
@@ -94,7 +95,7 @@ class Drought(ComputeThresholds):
 
         projection = era5_raster.GetProjection()
         x_size, y_size = era5_raster.RasterXSize, era5_raster.RasterYSize
-        geo_transform = era5_raster.GetGeoTransform()
+        geo_transform = list(era5_raster.GetGeoTransform())
         output_array = np.zeros(x_size * y_size)
         for k, v in value_dict.items():
             output_array[k] = np.percentile(v, self._percentile)
@@ -113,7 +114,7 @@ class Wind(ComputeThresholds):
 
         projection = era5_raster.GetProjection()
         x_size, y_size = era5_raster.RasterXSize, era5_raster.RasterYSize
-        geo_transform = era5_raster.GetGeoTransform()
+        geo_transform = list(era5_raster.GetGeoTransform())
         output_array = np.zeros((y_size, x_size))
         mangrove_locations = mangrove_locations.reshape((y_size, x_size))
         output_array[mangrove_locations] = threshold

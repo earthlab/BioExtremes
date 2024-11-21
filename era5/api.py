@@ -94,7 +94,7 @@ class MonthlySingleLevelInstantaneous(BaseAPI):
                         fd.write(chunk)
                     else:
                         break
-
+            print(out_file)
             create_filtered_monthly_file(out_file, out_file.replace('.nc', '.tif'))
             os.remove(out_file)
 
