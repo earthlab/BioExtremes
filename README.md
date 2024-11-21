@@ -22,6 +22,11 @@ pip install -r requirements.txt
 	https://urs.earthdata.nasa.gov/users/new. 
 -	NASA EarthData credentials set as BEX_USER and BEX_PWD environment variables
 
+Or run the code using Docker:
+```bash
+docker container run -it earthlabcu/bio_extremes
+```
+
 ### Suggested Workflow
 
 #### 1. Identify Overlapping GEDI Files

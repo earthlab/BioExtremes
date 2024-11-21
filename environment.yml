@@ -16,3 +16,7 @@ dependencies:
   - cfgrib
   - gdal
   - xarray
+  - seaborn
+  - netCDF4
+  - statsmodels
+  - geopandas
