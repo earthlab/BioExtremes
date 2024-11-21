@@ -2,7 +2,7 @@ from plotting import Plotter
 import argparse
 
 
-def main():
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Plot data based on different types using the Plotter class."
     )

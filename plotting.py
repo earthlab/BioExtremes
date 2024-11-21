@@ -11,6 +11,7 @@ class Plotter:
     def __init__(self, base_data_dir: str, output_dir: str):
         self.base_data_dir = base_data_dir
         self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
         self.wind_indep_vars = ['wind_intensity', 'wind_duration', 'wind_frequency', 'wind_time_since_last_event']
         self.rain_indep_vars = ['drought_frequency', 'drought_intensity', 'drought_duration',
                                 'drought_time_since_last_event']
@@ -24,13 +25,11 @@ class Plotter:
         """Plot all eco regions, species diversity, or separate based on the type."""
         files_to_plot = self._get_files_to_plot(plot_type)
         if plot_type == 'eco_regions':
-            print(files_to_plot)
             self.plot_combined(files_to_plot, 'eco_regions_combined', plot_type)
         elif plot_type == 'species_richness':
             files_to_plot = sorted(files_to_plot, key=lambda x: int(os.path.basename(x).split('_')[2]))
             self.plot_combined(files_to_plot, 'species_richness_combined', plot_type)
         elif plot_type == 'global':
-            print(files_to_plot)
             self.plot_combined(files_to_plot, 'global', plot_type)
 
     def plot_combined(self, csv_files: List[str], base_name: str, plot_type):
@@ -56,7 +55,6 @@ class Plotter:
         """Get a list of files to plot based on the plot type."""
         path = self.base_data_dir
         if plot_type == "species_richness":
-            print([os.path.join(path, file) for file in os.listdir(path) if file.startswith('species_richness')])
             return [os.path.join(path, file) for file in os.listdir(path) if file.startswith('species_richness')]
         if plot_type == 'eco_regions':
             return [os.path.join(path, file) for file in os.listdir(path) if not file.startswith('species_richness')]
