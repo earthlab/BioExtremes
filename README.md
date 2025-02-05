@@ -1,14 +1,17 @@
-# BioExtremes
-Project funded by CIRES IRP 2023
+# BioExtremes Open-source Tool
 
-The main objective of this project is to develop an open-source tool that facilitates the use and integration of the 
-new generation of space-borne laser scanners and imaging spectrometers for studies on biodiversity and extreme events. 
-The specific objectives are: 1. Understand the effects of anomalous rainfall and wind gusts on mangrove ecosystem 
-homogenization worldwide, and 2. Assess the role of species diversity in ecosystem response to extreme events.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14816537.svg)](https://doi.org/10.5281/zenodo.14816537)
+
+## BioExtremes is a flexible Python tool designed for analyzing extreme weather events and ecosystem structures on a global scale. 
+
+BioExtremes tool is a set of several Python tools for downloading and examining GEDI and ERA5 datasets worldwide. The tool includes a versatile GEDI granule-level filter that allows users to identify the URLs of granules intersecting an area of interest. Additionally, it features a shot-level filter that enables users to discard irrelevant or low-quality data based on their specifications after the granule has been downloaded. With BioExtremes, users can also extract extreme weather metrics—including intensity, duration, frequency, and time since the last event—from ERA5 datasets using various thresholds. Furthermore, users can perform regression analyses between the GEDI and ERA5 datasets.
+
+This tool results from the "BioExtremes - the role of Biodiversity in mangrove ecosystem response to Extreme events" project funded by CIRES IRP 2023 (PI: Cibele Amaral, Earth Lab, CIRES, University of Colorado Boulder)
 
 ![image](https://github.com/earthlab/BioExtremes/assets/67020853/773b417a-e15d-454a-b20a-948994084da9)
 
-## Running the Code
+
+## Running the Codes
 
 ### Prerequisites
 
@@ -164,9 +167,13 @@ the eco regions and their regressions in one place as well as the species richne
 Example plotting command:
 ```bash
 python bin/plot_gedi_extreme_events.py --input_dir data/gedi_era5_combined/2019_2020_combined --output_dir data/regressions
+
 ```
 This command will:
 - Calculate the regressions for each marine region, GEDI, and extreme event combination and combine the marine regions on one plot. Saves the plot to `data/regressions`.
 - Calculate the regressions for each species richness class, GEDI, and extreme event combination and combine the species richness classes on one plot. Saves the plot to `data/regressions`.
 - Calculate the regressions for each GEDI and extreme event combination for all data points globally. Saves the plot to `data/regressions`.
 - Create violin plots and tables for each GEDI data set and writes them to `data/regressions`.
+
+## How to cite: 
+Verleye, E., Seidl, F., & Amaral, C. (2025). BioExtremes open-source tool. Zenodo. https://doi.org/10.5281/zenodo.14816537 
