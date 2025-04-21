@@ -175,7 +175,7 @@ This command will:
 - Calculate the regressions for each GEDI and extreme event combination for all data points globally. Saves the plot to `data/regressions`.
 - Create violin plots and tables for each GEDI data set and writes them to `data/regressions`.
 
-## References:
+## References
 Dubayah R., Hofton, M., Blair, J. B., Armston, J., Tang, H., Luthcke, S. (2020). GEDI L2A Elevation and Height Metrics Data Global Footprint Level V001. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/GEDI/GEDI02_A.001
 
 Dubayah R., Tang, H., Armston, J., Luthcke, S., Hofton, M., Blair, J. B. (2020). GEDI L2B Canopy Cover and Vertical Profile Metrics Data Global Footprint Level V001. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/GEDI/GEDI02_B.001
@@ -184,5 +184,5 @@ González-Trujillo, J. D., Román-Cuesta, R. M., Muñiz-Castillo, A. I., Amaral,
 
 Hersbach, H., Bell, B., Berrisford, P., Hirahara, S., Horányi, A., Muñoz-Sabater, J., Nicolas, J., Peubey, C., Radu, R., Schepers, D., Simmons, A., Soci, C., Abdalla, S., Abellan, X., Balsamo, G., Bechtold, P., Biavati, G., Bidlot, J., Bonavita, M., . . .  Thépaut, N. (2020). The ERA5 global reanalysis. Quarterly Journal of the Royal Meteorological Society, 146(730), 1999-2049. https://doi.org/10.1002/qj.3803
 
-## How to cite: 
+## How to cite this tool 
 Verleye, E., Seidl, F., & Amaral, C. (2025). BioExtremes open-source tool. Zenodo. https://doi.org/10.5281/zenodo.14816537 
