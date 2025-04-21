@@ -177,8 +177,11 @@ This command will:
 
 ## References:
 Dubayah R., Hofton, M., Blair, J. B., Armston, J., Tang, H., Luthcke, S. (2020). GEDI L2A Elevation and Height Metrics Data Global Footprint Level V001. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/GEDI/GEDI02_A.001
+
 Dubayah R., Tang, H., Armston, J., Luthcke, S., Hofton, M., Blair, J. B. (2020). GEDI L2B Canopy Cover and Vertical Profile Metrics Data Global Footprint Level V001. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/GEDI/GEDI02_B.001
+
 González-Trujillo, J. D., Román-Cuesta, R. M., Muñiz-Castillo, A. I., Amaral, C. H., & Araújo, M. B. (2023). Multiple dimensions of extreme weather events and their impacts on biodiversity. Climatic Change, 176(11), 155. https://doi.org/10.1007/s10584-023-03622-0
+
 Hersbach, H., Bell, B., Berrisford, P., Hirahara, S., Horányi, A., Muñoz-Sabater, J., Nicolas, J., Peubey, C., Radu, R., Schepers, D., Simmons, A., Soci, C., Abdalla, S., Abellan, X., Balsamo, G., Bechtold, P., Biavati, G., Bidlot, J., Bonavita, M., . . .  Thépaut, N. (2020). The ERA5 global reanalysis. Quarterly Journal of the Royal Meteorological Society, 146(730), 1999-2049. https://doi.org/10.1002/qj.3803
 
 ## How to cite: 
